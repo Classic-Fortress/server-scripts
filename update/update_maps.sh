@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# nQWTFsv maps update bash script (for Linux)
+# Classic Fortress maps update bash script (for Linux)
 # by Empezar
 
 # Parameters: --random-mirror --restart --no-restart
@@ -13,23 +13,23 @@ then
         exit
 fi
 
-# Change folder to nQWTFsv
-cd `cat ~/.nqwtfsv/install_dir`
+# Change folder to Classic Fortress
+cd `cat ~/.cfortsv/install_dir`
 
 echo
-echo "Welcome to the nQWTFsv maps updater"
+echo "Welcome to the Classic Fortress maps updater"
 echo "==================================="
 echo
 
-# Download nqwtf.ini
+# Download cfort.ini
 mkdir -p tmp
 cd tmp
-wget --inet4-only -q -O nqwtf.ini http://nqwtf.sourceforge.net/nqwtf.ini
-if [ -s "nqwtf.ini" ]
+wget --inet4-only -q -O cfort.ini https://raw.githubusercontent.com/Classic-Fortress/client-installer/master/cfort.ini
+if [ -s "cfort.ini" ]
 then
         echo foo >> /dev/null
 else
-        echo "Error: Could not download nqwtf.ini. Better luck next time. Exiting."
+        echo "Error: Could not download cfort.ini. Better luck next time. Exiting."
         cd ..
         rm -rf tmp
         exit
@@ -37,23 +37,23 @@ fi
 
 # List all the available mirrors
 echo "From what mirror would you like to download the maps?"
-grep "[0-9]\{1,2\}=\".*" nqwtf.ini | cut -d "\"" -f2 | nl
+grep "[0-9]\{1,2\}=\".*" cfort.ini | cut -d "\"" -f2 | nl
 if [ "$1" == "--random-mirror" ] || [ "$2" == "--random-mirror" ] || [ "$3" == "--random-mirror" ] || [ "$4" == "--random-mirror" ]; then
         mirror=""
 else
         read -p "Enter mirror number [random]: " mirror
 fi
-mirror=$(grep "^$mirror=[fhtp]\{3,4\}://[^ ]*$" nqwtf.ini | cut -d "=" -f2)
+mirror=$(grep "^$mirror=[fhtp]\{3,4\}://[^ ]*$" cfort.ini | cut -d "=" -f2)
 if [ "$mirror" = "" ]
 then
         echo;echo -n "* Using mirror: "
-        RANGE=$(expr$(grep "[0-9]\{1,2\}=\".*" nqwtf.ini | cut -d "\"" -f2 | nl | tail -n1 | cut -f1) + 1)
+        RANGE=$(expr$(grep "[0-9]\{1,2\}=\".*" cfort.ini | cut -d "\"" -f2 | nl | tail -n1 | cut -f1) + 1)
         while [ "$mirror" = "" ]
         do
                 number=$RANDOM
                 let "number %= $RANGE"
-                mirror=$(grep "^$number=[fhtp]\{3,4\}://[^ ]*$" nqwtf.ini | cut -d "=" -f2)
-                mirrorname=$(grep "^$number=\".*" nqwtf.ini | cut -d "\"" -f2)
+                mirror=$(grep "^$number=[fhtp]\{3,4\}://[^ ]*$" cfort.ini | cut -d "=" -f2)
+                mirrorname=$(grep "^$number=\".*" cfort.ini | cut -d "\"" -f2)
         done
         echo "$mirrorname"
 fi
