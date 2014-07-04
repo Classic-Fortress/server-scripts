@@ -134,44 +134,34 @@ if [ "$restart" == "y" ]; then
 fi
 
 # Move configs into place
-if [ "$1" == "--install" ] || [ "$2" == "--install" ] || [ "$3" == "--install" ] || [ "$4" == "--install" ]; then
-        sure="y"
-else
-        echo;echo "Your old configuration files will now be removed and replaced. The settings that you picked during setup will be untouched."
-        echo;read -p "Are you sure you want to continue? (y/n) [y]: " sure
-        echo
-fi
-if [ "$sure" != "n" ]
-then
-        echo -n "* Moving configs into place..."
-        chmod -f -x "$directory/start_servers.sh" 2> /dev/null
-        chmod -f -x "$directory/stop_servers.sh" 2> /dev/null
-        chmod -f -x "$directory/update_binaries.sh" 2> /dev/null
-        chmod -f -x "$directory/update_configs.sh" 2> /dev/null
-        chmod -f -x "$directory/update_maps.sh" 2> /dev/null
-        [ ! -e "$directory/fortress/fortress.cfg" ] || mv "$directory/fortress/fortress.cfg" "$directory/backup/configs/fortress.cfg"
-        [ ! -e "$directory/qw/mvdsv.cfg" ] || mv "$directory/qw/mvdsv.cfg" "$directory/backup/configs/mvdsv.cfg"
-        [ ! -e "$directory/qw/server.cfg" ] || mv "$directory/qw/server.cfg" "$directory/backup/configs/server.cfg"
-        [ ! -e "$directory/qtv/qtv.cfg" ] || mv "$directory/qtv/qtv.cfg" "$directory/backup/configs/qtv.cfg"
-        [ ! -e "$directory/qwfwd/qwfwd.cfg" ] || mv "$directory/qwfwd/qwfwd.cfg" "$directory/backup/configs/qwfwd.cfg"
-        [ ! -e "$directory/update_binaries.sh" ] || mv "$directory/update_binaries.sh" "$directory/backup/update/update_binaries.sh"
-        [ ! -e "$directory/update_configs.sh" ] || mv "$directory/update_configs.sh" "$directory/backup/update/update_configs.sh"
-        [ ! -e "$directory/update_maps.sh" ] || mv "$directory/update_maps.sh" "$directory/backup/update/update_maps.sh"
-        [ ! -e "$directory/start_servers.sh" ] || mv "$directory/start_servers.sh" "$directory/backup/run/start_servers.sh"
-        [ ! -e "$directory/stop_servers.sh" ] || mv "$directory/stop_servers.sh" "$directory/backup/run/stop_servers.sh"
+echo -n "* Moving configs into place..."
+chmod -f -x "$directory/start_servers.sh" 2> /dev/null
+chmod -f -x "$directory/stop_servers.sh" 2> /dev/null
+chmod -f -x "$directory/update_binaries.sh" 2> /dev/null
+chmod -f -x "$directory/update_configs.sh" 2> /dev/null
+chmod -f -x "$directory/update_maps.sh" 2> /dev/null
+[ ! -e "$directory/fortress/fortress.cfg" ] || mv "$directory/fortress/fortress.cfg" "$directory/backup/configs/fortress.cfg"
+[ ! -e "$directory/qw/mvdsv.cfg" ] || mv "$directory/qw/mvdsv.cfg" "$directory/backup/configs/mvdsv.cfg"
+[ ! -e "$directory/qw/server.cfg" ] || mv "$directory/qw/server.cfg" "$directory/backup/configs/server.cfg"
+[ ! -e "$directory/qtv/qtv.cfg" ] || mv "$directory/qtv/qtv.cfg" "$directory/backup/configs/qtv.cfg"
+[ ! -e "$directory/qwfwd/qwfwd.cfg" ] || mv "$directory/qwfwd/qwfwd.cfg" "$directory/backup/configs/qwfwd.cfg"
+[ ! -e "$directory/update_binaries.sh" ] || mv "$directory/update_binaries.sh" "$directory/backup/update/update_binaries.sh"
+[ ! -e "$directory/update_configs.sh" ] || mv "$directory/update_configs.sh" "$directory/backup/update/update_configs.sh"
+[ ! -e "$directory/update_maps.sh" ] || mv "$directory/update_maps.sh" "$directory/backup/update/update_maps.sh"
+[ ! -e "$directory/start_servers.sh" ] || mv "$directory/start_servers.sh" "$directory/backup/run/start_servers.sh"
+[ ! -e "$directory/stop_servers.sh" ] || mv "$directory/stop_servers.sh" "$directory/backup/run/stop_servers.sh"
 
-        mv "$tmpdirectory/fortress/fortress.cfg" "$directory/fortress/fortress.cfg"
-        mv "$tmpdirectory/qw/mvdsv.cfg" "$directory/qw/mvdsv.cfg"
-        mv "$tmpdirectory/qw/server.cfg" "$directory/qw/server.cfg"
-        mv "$tmpdirectory/qtv/qtv.cfg" "$directory/qtv/qtv.cfg"
-        mv "$tmpdirectory/qwfwd/qwfwd.cfg" "$directory/qwfwd/qwfwd.cfg"
-        mv "$tmpdirectory/update_binaries.sh" "$directory/update_binaries.sh"
-        mv "$tmpdirectory/update_configs.sh" "$directory/update_configs.sh"
-        mv "$tmpdirectory/update_maps.sh" "$directory/update_maps.sh"
-        mv "$tmpdirectory/start_servers.sh" "$directory/start_servers.sh"
-        mv "$tmpdirectory/stop_servers.sh" "$directory/stop_servers.sh"
-        echo "done"
-fi
+mv "$tmpdirectory/fortress/fortress.cfg" "$directory/fortress/fortress.cfg"
+mv "$tmpdirectory/qw/mvdsv.cfg" "$directory/qw/mvdsv.cfg"
+mv "$tmpdirectory/qw/server.cfg" "$directory/qw/server.cfg"
+mv "$tmpdirectory/qtv/qtv.cfg" "$directory/qtv/qtv.cfg"
+mv "$tmpdirectory/qwfwd/qwfwd.cfg" "$directory/qwfwd/qwfwd.cfg"
+mv "$tmpdirectory/update_binaries.sh" "$directory/update_binaries.sh"
+mv "$tmpdirectory/update_configs.sh" "$directory/update_configs.sh"
+mv "$tmpdirectory/update_maps.sh" "$directory/update_maps.sh"
+mv "$tmpdirectory/start_servers.sh" "$directory/start_servers.sh"
+mv "$tmpdirectory/stop_servers.sh" "$directory/stop_servers.sh"
+echo "done"
 
 # Remove temporary directory
 echo -n "* Cleaning up..."
