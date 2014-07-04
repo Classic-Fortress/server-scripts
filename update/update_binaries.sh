@@ -1,167 +1,137 @@
 #!/bin/bash
 
-# nQWTFsv binary update bash script (for Linux)
+# Classic Fortress binary update bash script (for Linux)
 # by Empezar
 
 # Parameters: --random-mirror --restart --no-restart
 
+error() {
+        printf "ERROR: %s\n" "$*"
+        [ -n "$created" ] || {
+                cd
+                echo "The directory $tmpdirectory is about to be removed, press ENTER to confirm or CTRL+C to exit." 
+                read dummy
+                rm -rf $tmpdirectory
+        }
+        exit 1
+}
+
 # Check if unzip is installed
-unzip=`which unzip`
-if [ "$unzip"  = "" ]
-then
-        echo "Unzip is not installed. Please install it and run the script again."
-        exit
-fi
+which unzip >/dev/null || error "The package 'unzip' is not installed. Please install it and run the installation again."
 
-# Change folder to nQWTFsv
-cd `cat ~/.nqwtfsv/install_dir`
+# Check if curl is installed
+which curl >/dev/null || error "The package 'curl' is not installed. Please install it and run the installation again."
 
-# Check if QTV and QWFWD is installed
-if [ -d "qtv" ]; then qtv="1"; fi;
-if [ -d "qwfwd" ]; then qwfwd=1; fi;
+# Change folder to Classic Fortress
+directory=$(cat ~/.cfortsv/install_dir)
+tmpdirectory=$directory/tmp
+mkdir -p $tmpdirectory $directory/backup/bin
+cd $tmpdirectory
 
 echo
-echo "Welcome to the nQWTFsv binary updater"
-echo "====================================="
+echo "Welcome to the Classic Fortress binary updater"
+echo "=============================================="
 echo
 
-# Download nqwtf.ini
-mkdir tmp
-cd tmp
-wget --inet4-only -q -O nqwtf.ini http://nqwtf.sourceforge.net/nqwtf.ini
-if [ -s "nqwtf.ini" ]
-then
-        echo foo >> /dev/null
-else
-        echo "Error: Could not download nqwtf.ini. Better luck next time. Exiting."
-        exit
-fi
+# Download cfort.ini
+wget --inet4-only -q -O cfort.ini https://raw.githubusercontent.com/Classic-Fortress/client-installer/master/cfort.ini || error "Failed to download cfort.ini"
+[ -s "cfort.ini" ] || error "Downloaded cfort.ini but file is empty?! Exiting."
 
 # List all the available mirrors
 echo "From what mirror would you like to download the binaries?"
-grep "[0-9]\{1,2\}=\".*" nqwtf.ini | cut -d "\"" -f2 | nl
-if [ "$1" == "--random-mirror" ] || [ "$2" == "--random-mirror" ] || [ "$3" == "--random-mirror" ] || [ "$4" == "--random-mirror" ]; then
-        mirror=""
-else
-        read -p "Enter mirror number [random]: " mirror
-fi
-mirror=$(grep "^$mirror=[fhtp]\{3,4\}://[^ ]*$" nqwtf.ini | cut -d "=" -f2)
-if [ "$mirror" = "" ]
-then
+mirrors=$(grep "[0-9]\{1,2\}=\".*" cfort.ini | cut -d "\"" -f2 | nl | wc -l)
+grep "[0-9]\{1,2\}=\".*" cfort.ini | cut -d "\"" -f2 | nl
+printf "Enter mirror number [random]: "
+read mirror
+mirror=$(grep "^$mirror=[fhtp]\{3,4\}://[^ ]*$" cfort.ini | cut -d "=" -f2)
+if [ -n "$mirror" && $mirrors > 1 ]; then
         echo;echo -n "* Using mirror: "
-        RANGE=$(expr$(grep "[0-9]\{1,2\}=\".*" nqwtf.ini | cut -d "\"" -f2 | nl | tail -n1 | cut -f1) + 1)
-        while [ "$mirror" = "" ]
+        range=$(expr$(grep "[0-9]\{1,2\}=\".*" cfort.ini | cut -d "\"" -f2 | nl | tail -n1 | cut -f1) + 1)
+        while [ -z "$mirror" ]
         do
                 number=$RANDOM
-                let "number %= $RANGE"
-                mirror=$(grep "^$number=[fhtp]\{3,4\}://[^ ]*$" nqwtf.ini | cut -d "=" -f2)
-                mirrorname=$(grep "^$number=\".*" nqwtf.ini | cut -d "\"" -f2)
+                let "number %= $range"
+                mirror=$(grep "^$number=[fhtp]\{3,4\}://[^ ]*$" cfort.ini | cut -d "=" -f2)
+                mirrorname=$(grep "^$number=\".*" cfort.ini | cut -d "\"" -f2)
         done
         echo "$mirrorname"
+else
+        mirror=$(grep "^1=[fhtp]\{3,4\}://[^ ]*$" cfort.ini | cut -d "=" -f2)
 fi
-mkdir -p id1
-echo
+echo;echo
 
 # Download binaries
 echo "=== Downloading ==="
-wget --inet4-only -O qwtf-sv-bin-x86.zip $mirror/qwtf-sv-bin-x86.zip
-
-# Terminate installation if not all packages were downloaded
-if [ -s "qwtf-sv-bin-x86.zip" ]
-then
-        if [ "$(du qwtf-sv-bin-x86.zip | cut -f1)" == "0" ]
-        then
-                echo "Error: The binaries failed to download. Better luck next time. Exiting."
-                rm -rf qwtf-sv-bin-x86.zip nqwtf.ini
-                cd ..
-                rm -rf tmp
-        fi
+if [ $(getconf LONG_BIT) = 64 ]; then
+        wget --inet4-only -O cfortsv-bin-x64.zip $mirror/cfortsv-bin-x64.zip || error "Failed to download $mirror/cfortsv-bin-x64.zip"
+        [ -s "cfortsv-bin-x64.zip" ] || error "Downloaded cfortsv-bin-x64.zip but file is empty?!"
 else
-        echo "Error: The binaries failed to download. Better luck next time. Exiting."
-        cd ..
-        rm -rf tmp
-        exit
+        wget --inet4-only -O cfortsv-bin-x86.zip $mirror/cfortsv-bin-x86.zip || error "Failed to download $mirror/cfortsv-bin-x86.zip"
+        [ -s "cfortsv-bin-x86.zip" ] || error "Downloaded cfortsv-bin-x86.zip but file is empty?!"
 fi
 
 # Ask to restart servers
 if [ "$1" == "--restart" ] || [ "$2" == "--restart" ] || [ "$3" == "--restart" ] || [ "$4" == "--restart" ]; then
         restart="y"
+elif [ "$1" == "--no-restart" ] || [ "$2" == "--no-restart" ] || [ "$3" == "--no-restart" ] || [ "$4" == "--no-restart" ]; then
+        restart="n"
 else
-        if [ "$1" == "--no-restart" ] || [ "$2" == "--no-restart" ] || [ "$3" == "--no-restart" ] || [ "$4" == "--no-restart" ]; then
-                restart="n"
-        else
-                read -p "Do you want the script to stop and restart your servers and proxies? (y/n) [n]: " restart
-                echo
-        fi
+        read -p "Do you want the script to stop and restart your servers and proxies? (y/n) [n]: " restart
+        echo
 fi
 
 # Install updates
 echo "=== Installing ==="
+
 # Extract binaries
 echo -n "* Extracting binaries..."
-unzip -qqo qwtf-sv-bin-x86.zip 2> /dev/null;echo "done"
+if [ $(getconf LONG_BIT) = 64 ]; then
+    (unzip -qqo cfortsv-bin-x64.zip 2>/dev/null && echo done) || echo fail
+else
+    (unzip -qqo cfortsv-bin-x86.zip 2>/dev/null && echo done) || echo fail
+fi
 
 # Set the correct permissions
-echo -n "* Setting permissions..."
-chmod -f +x mvdsv 2> /dev/null
-chmod -f -x ../mvdsv 2> /dev/null
-chmod 644 fortress/qwprogs.dat 2> /dev/null
-if [ "$qtv" == "1" ]
-then
-        chmod -f +x qtv/qtv.bin 2> /dev/null
-        chmod -f -x ../qtv/qtv.bin 2> /dev/null
-fi
-if [ "$qwfwd" == "1" ]
-then
-        chmod -f +x qwfwd/qwfwd.bin 2> /dev/null
-        chmod -f -x ../qwfwd/qwfwd.bin 2> /dev/null
-fi
+printf "* Setting permissions..."
+chmod -f +x "$tmpdirectory/mvdsv" 2> /dev/null
+chmod -f -x "$directory/mvdsv" 2> /dev/null
+chmod 644 "$tmpdirectory/fortress/qwprogs.dat" 2> /dev/null
+chmod -f +x "$tmpdirectory/qtv/qtv.bin" 2> /dev/null
+chmod -f -x "$directory/qtv/qtv.bin" 2> /dev/null
+chmod -f +x "$tmpdirectory/qwfwd/qwfwd.bin" 2> /dev/null
+chmod -f -x "$directory/qwfwd/qwfwd.bin" 2> /dev/null
 echo "done"
 
 # Stop servers
-if [ "$restart" == "y" ]
-then
-        echo "* Stopping servers and proxies...done"
-        ../stop_servers.sh
+if [ "$restart" == "y" ]; then
+        printf "* Stopping processes..."
+        [ ! -e "../stop_servers.sh" ] || ../stop_servers.sh --silent
+        echo "done"
 fi
 
 # Move binaries into place
-echo -n "* Moving binaries into place..."
-if [ -f ../mvdsv ]; then
-	mv ../mvdsv ../mvdsv.old
-fi
-mv mvdsv ../
-if [ -f ../fortress/qwprogs.dat ]; then
-	mv ../fortress/qwprogs.dat ../fortress/qwprogs.dat.old
-fi
-mv fortress/qwprogs.dat ../fortress/
-if [ "$qtv" == "1" ]
-then
-	if [ -f ../qtv/qtv.bin ]; then
-		mv ../qtv/qtv.bin ../qtv/qtv.bin.old
-	fi
-        mv qtv/qtv.bin ../qtv/
-fi
-if [ "$qwfwd" == "1" ]
-then
-	if [ -f ../qwfwd/qwfwd.bin ]; then
-        	mv ../qwfwd/qwfwd.bin ../qwfwd/qwfwd.bin.old
-	fi
-        mv qwfwd/qwfwd.bin ../qwfwd/
-fi
+printf "* Moving binaries into place..."
+[ ! -e "$directory/mvdsv" ] || mv "$directory/mvdsv" "$directory/backup/bin/mvdsv"
+mv "$tmpdirectory/mvdsv" "$directory/mvdsv"
+[ ! -e "$directory/fortress/qwprogs.dat" ] || mv "$directory/fortress/qwprogs.dat" "$directory/backup/bin/qwprogs.dat"
+mv "$tmpdirectory/fortress/qwprogs.dat" "$directory/fortress/qwprogs.dat"
+[ ! -e "$directory/qtv/qtv.bin" ] || mv "$directory/qtv/qtv.bin" "$directory/backup/bin/qtv.bin"
+mv "$tmpdirectory/qtv/qtv.bin" "$directory/qtv/qtv.bin"
+[ ! -e "$directory/qwfwd/qwfwd.bin" ] || mv "$directory/qwfwd/qwfwd.bin" "$directory/backup/bin/qwfwd.bin"
+mv "$tmpdirectory/qwfwd/qwfwd.bin" "$directory/qwfwd/qwfwd.bin"
 echo "done"
 
 # Remove temporary directory
-echo -n "* Cleaning up..."
-cd ..
-rm -rf tmp
+printf "* Cleaning up..."
+cd $directory
+rm -rf $tmpdirectory
 echo "done"
 
 # Restart servers
-if [ "$restart" == "y" ]
-then
-        echo "* Starting servers and proxies...done"
-        ./start_servers.sh > /dev/null 2>&1
+if [ "$restart" == "y" ]; then
+        printf "* Starting processes..."
+        [ ! -e "start_servers.sh" ] || ./start_servers.sh --silent
+        echo "done"
 fi
 
 echo;echo "Upgrade complete."
