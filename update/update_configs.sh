@@ -112,7 +112,7 @@ echo "=== Installing ==="
 
 # Convert DOS files to UNIX
 printf "* Converting DOS files to UNIX..."
-for file in $(find $tmpdir -iname "*.cfg" -or -iname "*.txt" -or -iname "*.sh" -or -iname "README")
+for file in $(find $tmpdir -type f -iname "*.cfg" -or -iname "*.txt" -or -iname "*.sh" -or -iname "README")
 do
     [ ! -f "$file" ] || cat $file|tr -d '\015' > tmpfile
     rm $file
