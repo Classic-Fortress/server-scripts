@@ -9,9 +9,9 @@ error() {
         printf "ERROR: %s\n" "$*"
         [ -n "$created" ] || {
                 cd
-                echo "The directory $tmpdirectory is about to be removed, press ENTER to confirm or CTRL+C to exit." 
+                echo "The directory $tmpdir is about to be removed, press ENTER to confirm or CTRL+C to exit." 
                 read dummy
-                rm -rf $tmpdirectory
+                rm -rf $tmpdir
         }
         exit 1
 }
@@ -24,9 +24,9 @@ which curl >/dev/null || error "The package 'curl' is not installed. Please inst
 
 # Change folder to Classic Fortress
 directory=$(cat ~/.cfortsv/install_dir)
-tmpdirectory=$directory/tmp
-mkdir -p $tmpdirectory
-cd $tmpdirectory
+tmpdir=$directory/tmp
+mkdir -p $tmpdir
+cd $tmpdir
 
 echo
 echo "Welcome to the Classic Fortress maps updater"
@@ -103,7 +103,7 @@ echo "done"
 # Remove temporary directory
 printf "* Cleaning up..."
 cd $directory
-rm -rf $tmpdirectory
+rm -rf $tmpdir
 echo "done"
 
 # Restart servers

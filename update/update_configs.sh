@@ -10,9 +10,9 @@ error() {
         printf "ERROR: %s\n" "$*"
         [ -n "$created" ] || {
                 cd
-                echo "The directory $tmpdirectory is about to be removed, press ENTER to confirm or CTRL+C to exit." 
+                echo "The directory $tmpdir is about to be removed, press ENTER to confirm or CTRL+C to exit." 
                 read dummy
-                rm -rf $tmpdirectory
+                rm -rf $tmpdir
         }
         exit 1
 }
@@ -22,9 +22,9 @@ which curl >/dev/null || error "The package 'curl' is not installed. Please inst
 
 # Change folder to Classic Fortress
 directory=$(cat ~/.cfortsv/install_dir)
-tmpdirectory=$directory/tmp
-mkdir -p $tmpdirectory $tmpdirectory/fortress $tmpdirectory/qw $tmpdirectory/qtv $tmpdirectory/qwfwd $directory/backup/configs $directory/backup/update $directory/backup/run
-cd $tmpdirectory
+tmpdir=$directory/tmp
+mkdir -p $tmpdir $tmpdir/fortress $tmpdir/qw $tmpdir/qtv $tmpdir/qwfwd $directory/backup/configs $directory/backup/update $directory/backup/run
+cd $tmpdir
 
 echo
 echo "Welcome to the Classic Fortress config updater"
@@ -112,7 +112,7 @@ echo "=== Installing ==="
 
 # Convert DOS files to UNIX
 printf "* Converting DOS files to UNIX..."
-for file in $(find $tmpdirectory -iname "*.cfg" -or -iname "*.txt" -or -iname "*.sh" -or -iname "README")
+for file in $(find $tmpdir -iname "*.cfg" -or -iname "*.txt" -or -iname "*.sh" -or -iname "README")
 do
     [ ! -f "$file" ] || cat $file|tr -d '\015' > tmpfile
     rm $file
@@ -151,22 +151,22 @@ chmod -f -x "$directory/update_maps.sh" 2> /dev/null
 [ ! -e "$directory/start_servers.sh" ] || mv "$directory/start_servers.sh" "$directory/backup/run/start_servers.sh"
 [ ! -e "$directory/stop_servers.sh" ] || mv "$directory/stop_servers.sh" "$directory/backup/run/stop_servers.sh"
 
-mv "$tmpdirectory/fortress/fortress.cfg" "$directory/fortress/fortress.cfg"
-mv "$tmpdirectory/qw/mvdsv.cfg" "$directory/qw/mvdsv.cfg"
-mv "$tmpdirectory/qw/server.cfg" "$directory/qw/server.cfg"
-mv "$tmpdirectory/qtv/qtv.cfg" "$directory/qtv/qtv.cfg"
-mv "$tmpdirectory/qwfwd/qwfwd.cfg" "$directory/qwfwd/qwfwd.cfg"
-mv "$tmpdirectory/update_binaries.sh" "$directory/update_binaries.sh"
-mv "$tmpdirectory/update_configs.sh" "$directory/update_configs.sh"
-mv "$tmpdirectory/update_maps.sh" "$directory/update_maps.sh"
-mv "$tmpdirectory/start_servers.sh" "$directory/start_servers.sh"
-mv "$tmpdirectory/stop_servers.sh" "$directory/stop_servers.sh"
+mv "$tmpdir/fortress/fortress.cfg" "$directory/fortress/fortress.cfg"
+mv "$tmpdir/qw/mvdsv.cfg" "$directory/qw/mvdsv.cfg"
+mv "$tmpdir/qw/server.cfg" "$directory/qw/server.cfg"
+mv "$tmpdir/qtv/qtv.cfg" "$directory/qtv/qtv.cfg"
+mv "$tmpdir/qwfwd/qwfwd.cfg" "$directory/qwfwd/qwfwd.cfg"
+mv "$tmpdir/update_binaries.sh" "$directory/update_binaries.sh"
+mv "$tmpdir/update_configs.sh" "$directory/update_configs.sh"
+mv "$tmpdir/update_maps.sh" "$directory/update_maps.sh"
+mv "$tmpdir/start_servers.sh" "$directory/start_servers.sh"
+mv "$tmpdir/stop_servers.sh" "$directory/stop_servers.sh"
 echo "done"
 
 # Remove temporary directory
 echo -n "* Cleaning up..."
 cd $directory
-rm -rf $tmpdirectory
+rm -rf $tmpdir
 echo "done"
 
 # Restart servers
