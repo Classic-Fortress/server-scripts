@@ -81,6 +81,8 @@ then
         exit
 fi
 
+mkdir -p ~/.cfortsv/pid
+
 # start mvdsv
 cd $(cat ~/.cfortsv/install_dir)
 [ "$silent" != "1" ] || echo -n "* Starting server (port 27500)..."
