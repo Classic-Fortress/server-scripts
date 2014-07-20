@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/bin/sh
 
-# Classic Fortress configuration update bash script (for Linux)
+# Classic Fortress Configuration Update bash script (for Linux)
 # by Empezar
 
 # Parameters: --random-mirror --restart --no-restart --install

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Classic Fortress maps update bash script (for Linux)
 # by Empezar

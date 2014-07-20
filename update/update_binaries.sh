@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/bin/sh
 
-# Classic Fortress binary update bash script (for Linux)
+# Classic Fortress Binary Update bash script (for Linux)
 # by Empezar
 
 # Parameters: --random-mirror --restart --no-restart
