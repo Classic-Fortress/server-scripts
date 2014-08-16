@@ -1,180 +1,254 @@
 #!/bin/sh
 
-# Classic Fortress Configuration Update bash script (for Linux)
-# by Empezar
+#############################################
+## CLASSIC FORTRESS UPDATE BINARIES SCRIPT ##
+#############################################
 
-# Parameters: --random-mirror --restart --no-restart --install
+# parameters:
+# --silent      makes the script silent and will
+#               automatically select a mirror and
+#               restart your servers and proxies.
+# --no-restart  will stop the script from auto-
+#               matically restarting your servers
+#               and proxies.
 
-# Check if unzip is installed
+##################################################
+## script starts here - do not edit lines below ##
+##################################################
+
+# functions
 error() {
+    [ $silent -eq 0 ] && {
+        echo
         printf "ERROR: %s\n" "$*"
-        [ -n "$created" ] || {
-                cd
-                echo "The directory $tmpdir is about to be removed, press ENTER to confirm or CTRL+C to exit." 
-                read dummy
-                rm -rf $tmpdir
-        }
-        exit 1
+    }
+
+    cd
+
+    # remove temporary directory if it exists
+    [ -d $tmpdir ] && rm -rf $tmpdir
+
+    # remove backup directory if it's empty
+    [ ! -z "$(ls -1 $backupdir)" ] && rm -rf $backupdir
+
+    exit 1
+}
+output() {
+    [ $silent -eq 0 ] && printf "%s" "$*"
+
+    return 0
+}
+outputn() {
+    [ $silent -eq 0 ] && printf "%s\n" "$*"
+
+    return 0
 }
 
-# Check if curl is installed
-which curl >/dev/null || error "The package 'curl' is not installed. Please install it and run the installation again."
+# initialize variables
+eval settingsdir=~/.cfortsv
+eval serverdir=$(cat $settingsdir/install_dir)
+eval backupdir=$serverdir/backup
+eval tmpdir=$serverdir/tmp
+github=https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/
+silent=0
+norestart=0
+fail=0
 
-# Change folder to Classic Fortress
-directory=$(cat ~/.cfortsv/install_dir)
-tmpdir=$directory/tmp
-mkdir -p $tmpdir $tmpdir/fortress $tmpdir/qw $tmpdir/qtv $tmpdir/qwfwd $directory/backup/configs $directory/backup/update $directory/backup/run
+# initialize folders
+mkdir -p $tmpdir $tmpdir/fortress $tmpdir/qtv $tmpdir/qw $tmpdir/qwfwd $backupdir
 cd $tmpdir
 
-echo
-echo "Welcome to the Classic Fortress config updater"
-echo "=============================================="
-echo
+# set silent mode if --silent parameter given
+[ "$1" = "--silent" ] || [ "$2" = "--silent" ] && silent=1
 
-# Download cfort.ini
-wget --inet4-only -q -O cfort.ini https://raw.githubusercontent.com/Classic-Fortress/client-installer/master/cfort.ini || error "Failed to download cfort.ini"
-[ -s "cfort.ini" ] || error "Downloaded cfort.ini but file is empty?! Exiting."
+# set restart mode if --restart parameter given
+[ "$1" = "--no-restart" ] || [ "$2" = "--no-restart" ] && norestart=1
 
-# List all the available mirrors
-echo "From what mirror would you like to download the binaries?"
-mirrors=$(grep "[0-9]\{1,2\}=\".*" cfort.ini | cut -d "\"" -f2 | nl | wc -l)
-grep "[0-9]\{1,2\}=\".*" cfort.ini | cut -d "\"" -f2 | nl
-printf "Enter mirror number [random]: "
-read mirror
-mirror=$(grep "^$mirror=[fhtp]\{3,4\}://[^ ]*$" cfort.ini | cut -d "=" -f2)
-if [ -n "$mirror" && $mirrors > 1 ]; then
-        echo;echo -n "* Using mirror: "
-        range=$(expr$(grep "[0-9]\{1,2\}=\".*" cfort.ini | cut -d "\"" -f2 | nl | tail -n1 | cut -f1) + 1)
-        while [ -z "$mirror" ]
-        do
-                number=$RANDOM
-                let "number %= $range"
-                mirror=$(grep "^$number=[fhtp]\{3,4\}://[^ ]*$" cfort.ini | cut -d "=" -f2)
-                mirrorname=$(grep "^$number=\".*" cfort.ini | cut -d "\"" -f2)
-        done
-        echo "$mirrorname"
-else
-        mirror=$(grep "^1=[fhtp]\{3,4\}://[^ ]*$" cfort.ini | cut -d "=" -f2)
-fi
-echo;echo
+# check if unzip and curl are installed
+[ `which unzip` ] || error "The package 'unzip' is not installed. Please install it and run the installation again."
+[ `which curl` ] || error "The package 'curl' is not installed. Please install it and run the installation again."
 
-# Download configuration files
-echo "=== Downloading ==="
-wget --inet4-only -O fortress/fortress.cfg https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/config/fortress/fortress.cfg || error "Failed to download fortress/fortress.cfg"
-wget --inet4-only -O qw/mvdsv.cfg https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/config/qw/mvdsv.cfg || error "Failed to download qw/mvdsv.cfg"
-wget --inet4-only -O qw/server.cfg https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/config/qw/server.cfg || error "Failed to download qw/server.cfg"
-wget --inet4-only -O qtv/qtv.cfg https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/config/qtv/qtv.cfg || error "Failed to download qtv/qtv.cfg"
-wget --inet4-only -O qwfwd/qwfwd.cfg https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/config/qwfwd/qwfwd.cfg || error "Failed to download qwfwd/qwfwd.cfg"
-wget --inet4-only -O update_binaries.sh https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/update/update_binaries.sh || error "Failed to download update_binaries.sh"
-wget --inet4-only -O update_configs.sh https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/update/update_configs.sh || error "Failed to download update_configs.sh"
-wget --inet4-only -O update_maps.sh https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/update/update_maps.sh || error "Failed to download update_maps.sh"
-wget --inet4-only -O start_servers.sh https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/run/start_servers.sh || error "Failed to download start_servers.sh"
-wget --inet4-only -O stop_servers.sh https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/run/stop_servers.sh || error "Failed to download stop_servers.sh"
-[ -s "$directory/fortress/config.cfg" ] || {
-        wget --inet4-only -O fortress/config.cfg https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/config/fortress/config.cfg || error "Failed to download fortress/config.cfg"
-        [ -s "fortress/config.cfg" ] || error "Downloaded fortress/config.cfg but file is empty?!"
-}
-[ -s "$directory/qtv/config.cfg" ] || {
-        wget --inet4-only -O qtv/config.cfg https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/config/qtv/config.cfg || error "Failed to download qtv/config.cfg"
-        [ -s "qtv/config.cfg" ] || error "Downloaded qtv/config.cfg but file is empty?!"
-}
-[ -s "$directory/qwfwd/config.cfg" ] || {
-        wget --inet4-only -O qwfwd/config.cfg https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/config/qwfwd/config.cfg || error "Failed to download qwfwd/config.cfg"
-        [ -s "qwfwd/config.cfg" ] || error "Downloaded qwfwd/config.cfg but file is empty?!"
+# download cfort.ini
+curl --silent --output $tmpdir/cfort.ini https://raw.githubusercontent.com/Classic-Fortress/client-installer/master/cfort.ini || \
+    error "Failed to download 'cfort.ini' (mirror information) from remote server."
+
+# check if cfort.ini actually contains anything
+[ -s $tmpdir/cfort.ini ] || error "Downloaded 'cfort.ini' but file is empty. Exiting."
+
+# skip mirror selection if --silent was specified
+[ $silent -eq 0 ] && {
+
+    outputn "Select a download mirror:"
+
+    # print mirrors and number them
+    grep "[0-9]\{1,2\}=\".*" $tmpdir/cfort.ini | cut -d "\"" -f2 | nl
+
+    output "Enter mirror number [random]: "
+
+    # read user's input
+    read mirror
+
+    # get mirror address from cfort.ini
+    mirror=$(grep "^$mirror=[fhtp]\{3,4\}://[^ ]*$" $tmpdir/cfort.ini | cut -d "=" -f2)
+
 }
 
-[ -s "fortress/fortress.cfg" ] || error "Downloaded fortress/fortress.cfg but file is empty?!"
-[ -s "qw/mvdsv.cfg" ] || error "Downloaded qw/mvdsv.cfg but file is empty?!"
-[ -s "qw/server.cfg" ] || error "Downloaded qw/server.cfg but file is empty?!"
-[ -s "qtv/qtv.cfg" ] || error "Downloaded qtv/qtv.cfg but file is empty?!"
-[ -s "qwfwd/qwfwd.cfg" ] || error "Downloaded qwfwd/qwfwd.cfg but file is empty?!"
-[ -s "update_binaries.sh" ] || error "Downloaded update_binaries.sh but file is empty?!"
-[ -s "update_configs.sh" ] || error "Downloaded update_configs.sh but file is empty?!"
-[ -s "update_maps.sh" ] || error "Downloaded update_maps.sh but file is empty?!"
-[ -s "start_servers.sh" ] || error "Downloaded start_servers.sh but file is empty?!"
-[ -s "stop_servers.sh" ] || error "Downloaded stop_servers.sh but file is empty?!"
+# count mirrors
+mirrors=$(grep "[0-9]=\"" $tmpdir/cfort.ini | wc -l)
 
-echo
+[ -z $mirror ] && [ $mirrors -gt 1 ] && {
 
+    # calculate range (amount of mirrors + 1)
+    range=$(expr$(grep "[0-9]=\"" $tmpdir/cfort.ini | nl | tail -n1 | cut -f1) + 1)
 
-# Ask to restart servers
-if [ "$1" == "--restart" ] || [ "$2" == "--restart" ] || [ "$3" == "--restart" ] || [ "$4" == "--restart" ]; then
-        restart="y"
-elif [ "$1" == "--no-restart" ] || [ "$2" == "--no-restart" ] || [ "$3" == "--no-restart" ] || [ "$4" == "--no-restart" ]; then
-        restart="n"
-else
-        read -p "Do you want the script to stop and restart your servers and proxies? (y/n) [n]: " restart
-        echo
-fi
+    while [ -z $mirror ]; do
 
-# Install updates
-echo "=== Installing ==="
+        # generate a random number
+        number=$RANDOM
 
-# Convert DOS files to UNIX
-printf "* Converting DOS files to UNIX..."
-for file in $(find $tmpdir -type f -iname "*.cfg" -or -iname "*.txt" -or -iname "*.sh" -or -iname "README")
-do
-    [ ! -f "$file" ] || cat $file|tr -d '\015' > tmpfile
-    rm $file
-    mv tmpfile $file
-done
-echo "done"
+        # divide the random number with the calculated range and put the remainder in $number
+        let "number %= $range"
 
-# Set the correct permissions
-echo -n "* Setting permissions..."
-find . -type f -exec chmod -f 644 {} \;
-chmod -f +x *.sh 2> /dev/null
-echo "done"
+        # get the nth mirror using the random number
+        mirror=$(grep "^$number=[fhtp]\{3,4\}://[^ ]*$" $tmpdir/cfort.ini | cut -d "=" -f2)
 
-# Stop servers
-if [ "$restart" == "y" ]; then
-        printf "* Stopping processes..."
-        [ ! -e "../stop_servers.sh" ] || ../stop_servers.sh --silent
-        echo "done"
-fi
+    done
 
-# Move configs into place
-echo -n "* Moving configs into place..."
-chmod -f -x "$directory/start_servers.sh" 2> /dev/null
-chmod -f -x "$directory/stop_servers.sh" 2> /dev/null
-chmod -f -x "$directory/update_binaries.sh" 2> /dev/null
-chmod -f -x "$directory/update_configs.sh" 2> /dev/null
-chmod -f -x "$directory/update_maps.sh" 2> /dev/null
-[ ! -e "$directory/fortress/fortress.cfg" ] || mv "$directory/fortress/fortress.cfg" "$directory/backup/configs/fortress.cfg"
-[ ! -e "$directory/qw/mvdsv.cfg" ] || mv "$directory/qw/mvdsv.cfg" "$directory/backup/configs/mvdsv.cfg"
-[ ! -e "$directory/qw/server.cfg" ] || mv "$directory/qw/server.cfg" "$directory/backup/configs/server.cfg"
-[ ! -e "$directory/qtv/qtv.cfg" ] || mv "$directory/qtv/qtv.cfg" "$directory/backup/configs/qtv.cfg"
-[ ! -e "$directory/qwfwd/qwfwd.cfg" ] || mv "$directory/qwfwd/qwfwd.cfg" "$directory/backup/configs/qwfwd.cfg"
-[ ! -e "$directory/update_binaries.sh" ] || mv "$directory/update_binaries.sh" "$directory/backup/update/update_binaries.sh"
-[ ! -e "$directory/update_configs.sh" ] || mv "$directory/update_configs.sh" "$directory/backup/update/update_configs.sh"
-[ ! -e "$directory/update_maps.sh" ] || mv "$directory/update_maps.sh" "$directory/backup/update/update_maps.sh"
-[ ! -e "$directory/start_servers.sh" ] || mv "$directory/start_servers.sh" "$directory/backup/run/start_servers.sh"
-[ ! -e "$directory/stop_servers.sh" ] || mv "$directory/stop_servers.sh" "$directory/backup/run/stop_servers.sh"
+} || mirror=$(grep "^1=[fhtp]\{3,4\}://[^ ]*$" $tmpdir/cfort.ini | cut -d "=" -f2)
 
-mv "$tmpdir/fortress/fortress.cfg" "$directory/fortress/fortress.cfg"
-mv "$tmpdir/qw/mvdsv.cfg" "$directory/qw/mvdsv.cfg"
-mv "$tmpdir/qw/server.cfg" "$directory/qw/server.cfg"
-mv "$tmpdir/qtv/qtv.cfg" "$directory/qtv/qtv.cfg"
-mv "$tmpdir/qwfwd/qwfwd.cfg" "$directory/qwfwd/qwfwd.cfg"
-mv "$tmpdir/update_binaries.sh" "$directory/update_binaries.sh"
-mv "$tmpdir/update_configs.sh" "$directory/update_configs.sh"
-mv "$tmpdir/update_maps.sh" "$directory/update_maps.sh"
-mv "$tmpdir/start_servers.sh" "$directory/start_servers.sh"
-mv "$tmpdir/stop_servers.sh" "$directory/stop_servers.sh"
-echo "done"
+# ask to restart servers if --silent and --no-restart were not used
+[ $silent -eq 0 ] && {
 
-# Remove temporary directory
-echo -n "* Cleaning up..."
-cd $directory
+    [ $norestart -eq 1 ] && restart="n" || read -p "Restart servers and proxies? (y/n) [y]: " restart
+
+}
+
+output "Installing configs..."
+
+# download configs
+curl --silent --output $tmpdir/fortress/fortress.cfg $github/config/fortress/fortress.cfg && output "." || fail=1
+curl --silent --output $tmpdir/qtv/qtv.cfg $github/config/qtv/qtv.cfg && output "." || fail=1
+curl --silent --output $tmpdir/qw/mvdsv.cfg $github/config/qw/mvdsv.cfg && output "." || fail=1
+curl --silent --output $tmpdir/qw/server.cfg $github/config/qw/server.cfg && output "." || fail=1
+curl --silent --output $tmpdir/qwfwd/qwfwd.cfg $github/config/qwfwd/qwfwd.cfg && output "." || fail=1
+curl --silent --output $tmpdir/getmap.sh $github/update/getmap.sh && output "." || fail=1
+curl --silent --output $tmpdir/update_binaries.sh $github/update/update_binaries.sh && output "." || fail=1
+curl --silent --output $tmpdir/update_configs.sh $github/update/update_configs.sh && output "." || fail=1
+curl --silent --output $tmpdir/update_maps.sh $github/update/update_maps.sh && output "." || fail=1
+curl --silent --output $tmpdir/start_servers.sh $github/run/start_servers.sh && output "." || fail=1
+curl --silent --output $tmpdir/stop_servers.sh $github/run/stop_servers.sh && output "." || fail=1
+[ -s $serverdir/fortress/config.cfg ] || curl --silent --output $serverdir/fortress/config.cfg $github/config/fortress/config.cfg && output "." || fail=1
+[ -s $serverdir/qtv/config.cfg ] || curl --silent --output $serverdir/qtv/config.cfg $github/config/qtv/config.cfg && output "." || fail=1
+[ -s $serverdir/qwfwd/config.cfg ] || curl --silent --output $serverdir/qwfwd/config.cfg $github/config/qwfwd/config.cfg && output "." || fail=1
+
+# check if files contain anything
+[ -s $tmpdir/fortress/fortress.cfg ] || fail=1
+[ -s $tmpdir/qtv/qtv.cfg ] || fail=1
+[ -s $tmpdir/qw/mvdsv.cfg ] || fail=1
+[ -s $tmpdir/qw/server.cfg ] || fail=1
+[ -s $tmpdir/qwfwd/qwfwd.cfg ] || fail=1
+[ -s $tmpdir/getmap.sh ] || fail=1
+[ -s $tmpdir/update_binaries.sh ] || fail=1
+[ -s $tmpdir/update_configs.sh ] || fail=1
+[ -s $tmpdir/update_maps.sh ] || fail=1
+[ -s $tmpdir/start_servers.sh ] || fail=1
+[ -s $tmpdir/stop_servers.sh ] || fail=1
+[ -s $serverdir/fortress/config.cfg ] || fail=1
+[ -s $serverdir/qtv/config.cfg ] || fail=1
+[ -s $serverdir/qwfwd/config.cfg ] || fail=1
+
+# abort if download failed
+[ $fail -eq 0 ] && output "." || {
+
+    outputn "fail"
+
+    error "Could not download configuration files. Try again later."
+
+}
+
+# stop servers and proxies if set to restart
+[ "$restart" = "y" ] && {
+
+    ($serverdir/stop_servers.sh --silent && output ".") || {
+
+        outputn "fail"
+
+        error "Could not stop servers and proxies. Exiting."
+
+    }
+
+}
+
+# create a tar.gz of old configs in backup directory
+cd $serverdir
+backupname="configs-backup-$(date +"%Y%m%d%H%M%S").tar.gz"
+tar czf $backupname \
+    fortress/fortress.cfg \
+    qtv/qtv.cfg \
+    qw/mvdsv.cfg \
+    qw/server.cfg \
+    qwfwd/qwfwd.cfg \
+    getmap.sh \
+    start_servers.sh \
+    stop_servers.sh \
+    update_binaries.sh \
+    update_configs.sh \
+    update_maps.sh \
+    2>/dev/null
+mv $backupname $backupdir 2>/dev/null || fail=1
+
+# abort if moving of old binaries failed
+[ $fail -eq 0 ] && output "." || {
+
+    outputn "fail"
+
+    error "Could not move old configs to backup directory. Something might be wrong with your installation."
+
+}
+
+# move new stuff to working directory
+find $tmpdir -name "*.cfg" -exec chmod 644 {} \;
+find $tmpdir -name "*.sh" -exec chmod +x {} \;
+mv $tmpdir/fortress/fortress.cfg $serverdir/fortress/fortress.cfg 2>/dev/null || fail=1
+mv $tmpdir/qtv/qtv.cfg $serverdir/qtv/qtv.cfg 2>/dev/null || fail=1
+mv $tmpdir/qw/mvdsv.cfg $serverdir/qw/mvdsv.cfg 2>/dev/null || fail=1
+mv $tmpdir/qw/server.cfg $serverdir/qw/server.cfg 2>/dev/null || fail=1
+mv $tmpdir/qwfwd/qwfwd.cfg $serverdir/qwfwd/qwfwd.cfg 2>/dev/null || fail=1
+mv $tmpdir/update_binaries.sh $serverdir/update_binaries.sh 2>/dev/null || fail=1
+mv $tmpdir/update_configs.sh $serverdir/update_configs.sh 2>/dev/null || fail=1
+mv $tmpdir/update_maps.sh $serverdir/update_maps.sh 2>/dev/null || fail=1
+mv $tmpdir/start_servers.sh $serverdir/start_servers.sh 2>/dev/null || fail=1
+mv $tmpdir/stop_servers.sh $serverdir/stop_servers.sh 2>/dev/null || fail=1
+[ -s $tmpdir/fortress/config.cfg ] && (mv $tmpdir/fortress/config.cfg $serverdir/fortress/config.cfg 2>/dev/null || fail=1)
+[ -s $tmpdir/qwfwd/config.cfg ] && (mv $tmpdir/qwfwd/config.cfg $serverdir/qwfwd/config.cfg 2>/dev/null || fail=1)
+[ -s $tmpdir/qtv/config.cfg ] && (mv $tmpdir/qtv/config.cfg $serverdir/qtv/config.cfg 2>/dev/null || fail=1)
+
+# abort if moving of binaries failed
+[ $fail -eq 0 ] && output "." || {
+
+    outputn "fail"
+
+    error "Could not install configs in server directory. Something might be wrong with your installation."
+
+}
+
+# remove temporary directory
 rm -rf $tmpdir
-echo "done"
+output "."
 
-# Restart servers
-if [ "$restart" == "y" ]; then
-        printf "* Starting processes..."
-        [ ! -e "start_servers.sh" ] || ./start_servers.sh --silent
-        echo "done"
-fi
+# start servers and proxies if set to restart
+[ "$restart" = "y" ] && {
 
-echo;echo "Update complete."
-echo
+    ($serverdir/start_servers.sh --silent && output ".") || {
+
+        outputn "fail"
+
+        error "Could not restart servers and proxies. Try restarting them manually."
+
+    }
+
+}
+
+outputn "done"
+
+exit 0

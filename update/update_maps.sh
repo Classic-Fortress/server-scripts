@@ -1,117 +1,198 @@
 #!/bin/sh
 
-# Classic Fortress maps update bash script (for Linux)
-# by Empezar
+#############################################
+## CLASSIC FORTRESS UPDATE BINARIES SCRIPT ##
+#############################################
 
-# Parameters: --random-mirror --restart --no-restart
+# parameters:
+# --silent      makes the script silent and will
+#               automatically select a mirror and
+#               restart your servers and proxies.
+# --no-restart  will stop the script from auto-
+#               matically restarting your servers
+#               and proxies.
 
+##################################################
+## script starts here - do not edit lines below ##
+##################################################
+
+# functions
 error() {
+    [ $silent -eq 0 ] && {
+        echo
         printf "ERROR: %s\n" "$*"
-        [ -n "$created" ] || {
-                cd
-                echo "The directory $tmpdir is about to be removed, press ENTER to confirm or CTRL+C to exit." 
-                read dummy
-                rm -rf $tmpdir
-        }
-        exit 1
+    }
+
+    cd
+
+    # remove temporary directory if it exists
+    [ -d $tmpdir ] && rm -rf $tmpdir
+
+    exit 1
+}
+output() {
+    [ $silent -eq 0 ] && printf "%s" "$*"
+
+    return 0
+}
+outputn() {
+    [ $silent -eq 0 ] && printf "%s\n" "$*"
+
+    return 0
 }
 
-# Check if unzip is installed
-which unzip >/dev/null || error "The package 'unzip' is not installed. Please install it and run the installation again."
+# initialize variables
+eval settingsdir=~/.cfortsv
+eval serverdir=$(cat $settingsdir/install_dir)
+eval fortressdir=$serverdir/fortress
+eval tmpdir=$serverdir/tmp
+github=https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/
+silent=0
+norestart=0
+fail=0
 
-# Check if curl is installed
-which curl >/dev/null || error "The package 'curl' is not installed. Please install it and run the installation again."
-
-# Change folder to Classic Fortress
-directory=$(cat ~/.cfortsv/install_dir)
-tmpdir=$directory/tmp
-mkdir -p $tmpdir
+# initialize folders
+mkdir -p $tmpdir $fortressdir/maps $fortressdir/progs $fortressdir/sound
 cd $tmpdir
 
-echo
-echo "Welcome to the Classic Fortress maps updater"
-echo "==================================="
-echo
+# set silent mode if --silent parameter given
+[ "$1" = "--silent" ] || [ "$2" = "--silent" ] && silent=1
 
-# Download cfort.ini
-wget --inet4-only -q -O cfort.ini https://raw.githubusercontent.com/Classic-Fortress/client-installer/master/cfort.ini || error "Failed to download cfort.ini"
-[ -s "cfort.ini" ] || error "Downloaded cfort.ini but file is empty?! Exiting."
+# set restart mode if --restart parameter given
+[ "$1" = "--no-restart" ] || [ "$2" = "--no-restart" ] && norestart=1
 
-# List all the available mirrors
-echo "From what mirror would you like to download the binaries?"
-mirrors=$(grep "[0-9]\{1,2\}=\".*" cfort.ini | cut -d "\"" -f2 | nl | wc -l)
-grep "[0-9]\{1,2\}=\".*" cfort.ini | cut -d "\"" -f2 | nl
-printf "Enter mirror number [random]: "
-read mirror
-mirror=$(grep "^$mirror=[fhtp]\{3,4\}://[^ ]*$" cfort.ini | cut -d "=" -f2)
-if [ -n "$mirror" && $mirrors > 1 ]; then
-        echo;echo -n "* Using mirror: "
-        range=$(expr$(grep "[0-9]\{1,2\}=\".*" cfort.ini | cut -d "\"" -f2 | nl | tail -n1 | cut -f1) + 1)
-        while [ -z "$mirror" ]
-        do
-                number=$RANDOM
-                let "number %= $range"
-                mirror=$(grep "^$number=[fhtp]\{3,4\}://[^ ]*$" cfort.ini | cut -d "=" -f2)
-                mirrorname=$(grep "^$number=\".*" cfort.ini | cut -d "\"" -f2)
-        done
-        echo "$mirrorname"
-else
-        mirror=$(grep "^1=[fhtp]\{3,4\}://[^ ]*$" cfort.ini | cut -d "=" -f2)
-fi
-echo;echo
+# check if unzip and curl are installed
+[ `which unzip` ] || error "The package 'unzip' is not installed. Please install it and run the installation again."
+[ `which curl` ] || error "The package 'curl' is not installed. Please install it and run the installation again."
 
-# Download maps
-echo "=== Downloading ==="
-wget --inet4-only -O cfortsv-maps.zip $mirror/cfortsv-maps.zip || error "Failed to download $mirror/cfortsv-maps.zip"
-[ -s "cfortsv-maps.zip" ] || error "Downloaded cfortsv-maps.zip but file is empty?!"
+# download cfort.ini
+curl --silent --output $tmpdir/cfort.ini https://raw.githubusercontent.com/Classic-Fortress/client-installer/master/cfort.ini || \
+    error "Failed to download 'cfort.ini' (mirror information) from remote server."
 
-# Ask to restart servers
-if [ "$1" == "--restart" ] || [ "$2" == "--restart" ] || [ "$3" == "--restart" ] || [ "$4" == "--restart" ]; then
-        restart="y"
-elif [ "$1" == "--no-restart" ] || [ "$2" == "--no-restart" ] || [ "$3" == "--no-restart" ] || [ "$4" == "--no-restart" ]; then
-        restart="n"
-else
-        read -p "Do you want the script to stop and restart your servers and proxies? (y/n) [n]: " restart
-        echo
-fi
+# check if cfort.ini actually contains anything
+[ -s $tmpdir/cfort.ini ] || error "Downloaded 'cfort.ini' but file is empty. Exiting."
 
-# Install updates
-echo "=== Installing ==="
+# skip mirror selection if --silent was specified
+[ $silent -eq 0 ] && {
 
-# Extract maps
-echo -n "* Extracting maps..."
-(unzip -qqo cfortsv-maps.zip 2>/dev/null && echo done) || echo fail
+    outputn "Select a download mirror:"
 
-# Set the correct permissions
-echo -n "* Setting permissions..."
-chmod 644 fortress/maps/* 2> /dev/null
-echo "done"
+    # print mirrors and number them
+    grep "[0-9]\{1,2\}=\".*" $tmpdir/cfort.ini | cut -d "\"" -f2 | nl
 
+    output "Enter mirror number [random]: "
 
-# Stop servers
-if [ "$restart" == "y" ]; then
-        printf "* Stopping processes..."
-        [ ! -e "../stop_servers.sh" ] || ../stop_servers.sh --silent
-        echo "done"
-fi
+    # read user's input
+    read mirror
 
-# Move maps into place
-printf "* Moving maps into place..."
-mv -f fortress/maps/* ../fortress/maps/
-echo "done"
+    # get mirror address from cfort.ini
+    mirror=$(grep "^$mirror=[fhtp]\{3,4\}://[^ ]*$" $tmpdir/cfort.ini | cut -d "=" -f2)
 
-# Remove temporary directory
-printf "* Cleaning up..."
-cd $directory
+}
+
+# count mirrors
+mirrors=$(grep "[0-9]=\"" $tmpdir/cfort.ini | wc -l)
+
+[ -z $mirror ] && [ $mirrors -gt 1 ] && {
+
+    # calculate range (amount of mirrors + 1)
+    range=$(expr$(grep "[0-9]=\"" $tmpdir/cfort.ini | nl | tail -n1 | cut -f1) + 1)
+
+    while [ -z $mirror ]; do
+
+        # generate a random number
+        number=$RANDOM
+
+        # divide the random number with the calculated range and put the remainder in $number
+        let "number %= $range"
+
+        # get the nth mirror using the random number
+        mirror=$(grep "^$number=[fhtp]\{3,4\}://[^ ]*$" $tmpdir/cfort.ini | cut -d "=" -f2)
+
+    done
+
+} || mirror=$(grep "^1=[fhtp]\{3,4\}://[^ ]*$" $tmpdir/cfort.ini | cut -d "=" -f2)
+
+# ask to restart servers if --silent and --no-restart were not used
+[ $silent -eq 0 ] && {
+
+    [ $norestart -eq 1 ] && restart="n" || read -p "Restart servers and proxies? (y/n) [y]: " restart
+
+}
+
+output "Installing maps..."
+
+# download maps
+curl --silent --output $tmpdir/cfortsv-maps.zip $mirror/cfortsv-maps.zip && output "." || fail=1
+
+# check if files contain anything
+[ -s $tmpdir/cfortsv-maps.zip ] || fail=1
+
+# abort if download failed
+[ $fail -eq 0 ] && output "." || {
+
+    outputn "fail"
+
+    error "Could not download maps. Try again later."
+
+}
+
+# unpack maps
+unzip -qqo $tmpdir/cfortsv-maps.zip -d $tmpdir 2>/dev/null || fail=1
+
+# abort if installation failed
+[ $fail -eq 0 ] && output "." || {
+
+    outputn "fail"
+
+    error "Could not unpack maps. Try running the script again."
+
+}
+
+# stop servers and proxies if set to restart
+[ "$restart" = "y" ] && {
+
+    ($serverdir/stop_servers.sh --silent && output ".") || {
+
+        outputn "fail"
+
+        error "Could not stop servers and proxies. Exiting."
+
+    }
+
+}
+
+# move new stuff to working directory
+[ -d $tmpdir/fortress/maps ] && (mv -n $tmpdir/fortress/maps/* $serverdir/fortress/maps/ 2>/dev/null || fail=1)
+[ -d $tmpdir/fortress/progs ] && (mv -n $tmpdir/fortress/progs/* $serverdir/fortress/progs/ 2>/dev/null || fail=1)
+[ -d $tmpdir/fortress/sound ] && (mv -n $tmpdir/fortress/sound/* $serverdir/fortress/sound/ 2>/dev/null || fail=1)
+
+# abort if moving of binaries failed
+[ $fail -eq 0 ] && output "." || {
+
+    outputn "fail"
+
+    error "Could not install maps in server directory. Something might be wrong with your installation."
+
+}
+
+# remove temporary directory
 rm -rf $tmpdir
-echo "done"
+output "."
 
-# Restart servers
-if [ "$restart" == "y" ]; then
-        printf "* Starting processes..."
-        [ ! -e "start_servers.sh" ] || ./start_servers.sh --silent
-        echo "done"
-fi
+# start servers and proxies if set to restart
+[ "$restart" = "y" ] && {
 
-echo;echo "Update complete."
-echo
+    ($serverdir/start_servers.sh --silent && output ".") || {
+
+        outputn "fail"
+
+        error "Could not restart servers and proxies. Try restarting them manually."
+
+    }
+
+}
+
+outputn "done"
+
+exit 0
