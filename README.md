@@ -1,5 +1,6 @@
 server-scripts
 ==============
 
-/update/  - Update scripts for installed servers<br />
-/config/  - Server configuration files
+/config/  - Server configuration files<br />
+/run/     - Server start/stop scripts<br />
+/update/  - Update scripts for installed servers
