@@ -1,153 +1,308 @@
-#!/bin/bash
+#!/bin/sh
 
-[ "$1" == "--silent" ] || silent=1
+###################################
+## CLASSIC FORTRESS START SCRIPT ##
+###################################
+
+# use services (0 = disable, 1 = enable)
+use_mvdsv=1
+use_qtv=1
+use_qwfwd=1
+
+# ports to use
+mvdsv_port=27500
+qtv_port=28000
+
+# use screen (0 = disable, 1 = enable)
+use_screen=0
+
+# save logs in ~/.cfortsv/logs/ (0 = disable, 1 = enable)
+logging=1
+
+##################################################
+## script starts here - do not edit lines below ##
+##################################################
+
+# print functions
+error() {
+    [ $silent -eq 0 ] && printf "ERROR: %s\n" "$*"
+
+    exit 1
+}
+warning() {
+    [ $silent -eq 0 ] && printf "WARNING: %s" "$*"
+
+    return 0
+}
+output() {
+    [ $silent -eq 0 ] && printf "%s" "$*"
+
+    return 0
+}
+outputn() {
+    [ $silent -eq 0 ] && printf "%s\n" "$*"
+
+    return 0
+}
+
+# initialize variables
+eval settingsdir=~/.cfortsv
+eval serverdir=$(cat $settingsdir/install_dir)
+silent=0
+error=0
+
+# initialize folders
+mkdir -p $settingsdir/pid
+[ $logging -eq 1 ] && mkdir -p $settingsdir/logs
+[ $use_mvdsv -eq 1 ] && [ $logging -eq 1 ] && touch $settingsdir/logs/server.log
+
+# set silent mode if first parameter is --silent
+[ "$1" = "--silent" ] && silent=1
+
+# check if screen exists if it's to be used
+[ $use_screen -eq 1 ] && [ ! `which screen` ] && \
+    error "The package 'screen' is not installed. Please install it or disable it."
+
+# check if anything is to be done
+[ $use_mvdsv -ne 1 ] && [ $use_qtv -ne 1 ] && [ $use_qwfwd -ne 1 ] && \
+    error "No services to start. Please edit start_servers.sh."
 
 # check if configuration files exist
-error=0
-if [ ! -f ~/.cfortsv/server.conf ] \
-|| [ ! -f ~/.cfortsv/qtv.conf ] \
-|| [ ! -f ~/.cfortsv/qwfwd.conf ]
-then
-        [ "$silent" != "1" ] || echo "WARNING: Symlinks to configuration files missing."
-        if [ -f ~/.cfortsv/install_dir ]
-        then
-                directory=$(cat ~/.cfortsv/install_dir)
-                if [ -f $directory/fortress/config.cfg ] \
-                && [ -f $directory/qtv/config.cfg ] \
-                && [ -f $directory/qwfwd/config.cfg ]
-                then
-                        [ "$silent" != "1" ] || printf "* Creating symlinks to configuration files..."
-                        rm -f ~/.cfortsv/server.conf ~/.cfortsv/qtv.conf ~/.cfortsv/qwfwd.conf
-                        ln -s $directory/fortress/config.cfg ~/.cfortsv/server.conf > /dev/null
-                        ln -s $directory/qtv/config.cfg ~/.cfortsv/qtv.conf
-                        ln -s $directory/qwfwd/config.cfg ~/.cfortsv/qwfwd.conf
-                        [ "$silent" != "1" ] || echo "[OK]"
-                else
-                        [ "$silent" != "1" ] || echo "ERROR: Your installation is missing important configuration files. Please reinstall Classic Fortress."
-                        exit
-                fi
-        else
-                [ "$silent" != "1" ] || echo "ERROR: Your installation is broken. Please reinstall Classic Fortress."
-                exit
-        fi
-fi
+[ ! -f $settingsdir/server.conf ] || [ ! -f $settingsdir/qtv.conf ] || [ ! -f $settingsdir/qwfwd.conf ] && {
 
-# check if classic fortress configuration file has been altered
-if (grep -Fq "//hostname" ~/.cfortsv/server.conf) \
-|| (grep -Fq "//rcon_password" ~/.cfortsv/server.conf) \
-|| (grep -Fq "//sv_admininfo" ~/.cfortsv/server.conf)
-then
-        [ "$silent" != "1" ] || echo "ERROR: You need to configure ~/.cfortsv/server.conf"
-        exit
-fi
-if (grep -Fq "rcon_password \"abc123\"" ~/.cfortsv/server.conf)
-then
-        [ "$silent" != "1" ] || echo "ERROR: Default rcon password cannot be used in ~/.cfortsv/server.conf"
-        exit
-fi
-if (grep -Fxq "quit" ~/.cfortsv/server.conf)
-then
-        [ "$silent" != "1" ] || echo "ERROR: You forgot to remove the \"quit\" line in ~/.cfortsv/server.conf"
-        exit
-fi
+    warning "Symlinks to configuration files missing."
 
-# check if qtv configuration file has been altered
-if (grep -Fq "//hostname" ~/.cfortsv/qtv.conf) \
-|| (grep -Fq "//admin_password" ~/.cfortsv/qtv.conf)
-then
-        [ "$silent" != "1" ] || echo "ERROR: You need to configure ~/.cfortsv/qtv.conf"
-        exit
-fi
-if (grep -Fq "admin_password \"abc123\"" ~/.cfortsv/qtv.conf)
-then
-        [ "$silent" != "1" ] || echo "ERROR: Default admin password cannot be used in ~/.cfortsv/qtv.conf"
-        exit
-fi
-if (grep -Fxq "quit" ~/.cfortsv/qtv.conf)
-then
-        [ "$silent" != "1" ] || echo "ERROR: You forgot to remove the \"quit\" line in ~/.cfortsv/qtv.conf"
-        exit
-fi
+    [ -f $settingsdir/install_dir ] && {
 
-# check if qwfwd configuration file has been altered
-if (grep -Fq "//set hostname" ~/.cfortsv/qwfwd.conf)
-then
-        [ "$silent" != "1" ] || echo "ERROR: You need to configure ~/.cfortsv/qwfwd.conf"
-        exit
-fi
-if (grep -Fxq "quit" ~/.cfortsv/qwfwd.conf)
-then
-        [ "$silent" != "1" ] || echo "ERROR: You forgot to remove the \"quit\" line in ~/.cfortsv/qwfwd.conf"
-        exit
-fi
+        [ -f $serverdir/fortress/config.cfg ] && [ -f $serverdir/qtv/config.cfg ] && [ -f $serverdir/qwfwd/config.cfg ] && {
 
-mkdir -p ~/.cfortsv/pid
+            output "* Creating symlinks to configuration files..."
 
-# start mvdsv
-cd $(cat ~/.cfortsv/install_dir)
-[ "$silent" != "1" ] || echo -n "* Starting server (port 27500)..."
-start=1
-if [ -f ~/.cfortsv/pid/server ]
-then
-        pid=$(cat ~/.cfortsv/pid/server)
-        if ps -p $pid > /dev/null
-        then
-                if ps -p $pid | grep mvdsv | grep -v grep > /dev/null
-                then
-                        [ "$silent" != "1" ] || echo "[ALREADY RUNNING]"
-                        start=0
-                fi
-        fi
-fi
-if [ $start == 1 ]
-then
-        ./mvdsv > /dev/null &
-        echo $! > ~/.cfortsv/pid/server
-        [ "$silent" != "1" ] || echo "[OK]"
-fi
+            rm -f $settingsdir/server.conf $settingsdir/qtv.conf $settingsdir/qwfwd.conf
+            ln -s $serverdir/fortress/config.cfg $settingsdir/server.conf > /dev/null
+            ln -s $serverdir/qtv/config.cfg $settingsdir/qtv.conf
+            ln -s $serverdir/qwfwd/config.cfg $settingsdir/qwfwd.conf
 
-# start qtv
-cd $(cat ~/.cfortsv/install_dir)/qtv
-[ "$silent" != "1" ] || echo -n "* Starting qtv (port 28000)..."
-start=1
-if [ -f ~/.cfortsv/pid/qtv ]
-then
-        pid=$(cat ~/.cfortsv/pid/qtv)
-        if ps -p $pid > /dev/null
-        then
-                if ps -p $pid | grep qtv | grep -v grep > /dev/null
-                then
-                        [ "$silent" != "1" ] || echo "[ALREADY RUNNING]"
-                        start=0
-                fi
-        fi
-fi
-if [ $start == 1 ]
-then
-        ./qtv.bin +exec qtv.cfg > /dev/null &
-        echo $! > ~/.cfortsv/pid/qtv
-        [ "$silent" != "1" ] || echo "[OK]"
-fi
+            outputn "[OK]"
 
-# start qwfwd
-cd $(cat ~/.cfortsv/install_dir)/qwfwd
-[ "$silent" != "1" ] || echo -n "* Starting qwfwd (port 30000)..."
-start=1
-if [ -f ~/.cfortsv/pid/qwfwd ]
-then
-        pid=$(cat ~/.cfortsv/pid/qwfwd)
-        if ps -p $pid > /dev/null
-        then
-                if ps -p $pid | grep qwfwd | grep -v grep > /dev/null
-                then
-                        [ "$silent" != "1" ] || echo "[ALREADY RUNNING]"
-                        start=0
-                fi
-        fi
-fi
-if [ $start == 1 ]
-then
-        ./qwfwd.bin > /dev/null &
-        echo $! > ~/.cfortsv/pid/qwfwd
-        [ "$silent" != "1" ] || echo "[OK]"
-fi
+        } || error "Your installation is missing important configuration files. Please reinstall Classic Fortress."
+
+    } || error "Your installation is broken. Please reinstall Classic Fortress."
+
+}
+
+[ $use_mvdsv -eq 1 ] && {
+
+    # check if classic fortress configuration file has been altered
+    [ `grep -F "//hostname" $settingsdir/server.conf` ] || [ `grep -F "//rcon_password" $settingsdir/server.conf` ] || [ `grep -F "//sv_admininfo" $settingsdir/server.conf` ] && \
+        error "You need to configure $settingsdir/server.conf"
+
+    # check if rcon password has been changed from the default value
+    [ `grep -F "rcon_password \"abc123\"" $settingsdir/server.conf` ] && \
+        error "Default rcon password cannot be used in $settingsdir/server.conf"
+
+    # check if the quit line has been removed
+    [ `grep -Fx "quit" $settingsdir/server.conf` ] && \
+        error "You forgot to remove the \"quit\" line in $settingsdir/server.conf"
+
+    fail=0
+    cd $serverdir
+
+    output "* Starting mvdsv (port $mvdsv_port)..."
+
+    # check if mvdsv can be run (32-bit libraries)
+    ldd mvdsv >/dev/null && {
+
+        # check if process id has been saved
+        [ -f $settingsdir/pid/server ] && pid=$(cat $settingsdir/pid/server) || pid=0
+
+        [ $use_screen -eq 1 ] && {
+
+            [ $pid -gt 0 ] && [ "$(ps -p $pid | grep screen | grep -v grep)" ] && outputn "[ALREADY RUNNING]" || {
+
+                # use screen to resume server window later
+                screen -dmS mvdsv ./mvdsv -port $mvdsv_port +set qtv_streamport $mvdsv_port
+
+                # store process id in settings folder
+                screen_info=$(screen -ls | grep mvdsv | sed -r 's/\s//g' | head -1)
+                pid=${screen_info%%.*}
+
+                # store process id in settings folder
+                echo $pid > $settingsdir/pid/server
+
+                outputn "[OK]"
+
+            }
+
+        } || {
+
+            [ $pid -gt 0 ] && [ "$(ps -p $pid | grep mvdsv | grep -v grep)" ] && outputn "[ALREADY RUNNING]" || {
+
+                [ $logging -eq 1 ] && {
+
+                    # log to logs dir if logging is enabled
+                    ./mvdsv -port $mvdsv_port +set qtv_streamport $mvdsv_port >> $settingsdir/logs/server.log &
+
+                } || {
+
+                    # start mvdsv in the background
+                    ./mvdsv -port $mvdsv_port +set qtv_streamport $mvdsv_port >/dev/null &
+
+                }
+
+                # store process id in settings folder
+                echo $! > $settingsdir/pid/server
+
+                outputn "[OK]"
+
+            }
+
+        }
+
+    } || {
+
+        outputn "[FAIL] (32-bit glibc missing)"
+
+        error=1
+
+    }
+
+}
+
+[ $use_qtv -eq 1 ] && {
+
+    # check if qtv configuration file has been altered
+    [ `grep -F "//hostname" $settingsdir/qtv.conf` ] || [ `grep -F "//admin_password" $settingsdir/qtv.conf` ] && \
+        error "You need to configure $settingsdir/qtv.conf"
+
+    # check if admin password has been changed from the default value
+    [ `grep -F "admin_password \"abc123\"" $settingsdir/qtv.conf` ] && \
+        error "Default admin password cannot be used in $settingsdir/qtv.conf"
+
+    # check if the quit line has been removed
+    [ `grep -Fx "quit" $settingsdir/qtv.conf` ] && \
+        error "You forgot to remove the \"quit\" line in $settingsdir/qtv.conf"
+
+    cd $serverdir/qtv
+
+    output "* Starting qtv (port $qtv_port)..."
+
+    # check if process id has been saved
+    [ -f $settingsdir/pid/qtv ] && pid=$(cat $settingsdir/pid/qtv) || pid=0
+
+    [ $use_screen -eq 1 ] && {
+
+        [ $pid -gt 0 ] && [ "$(ps -p $pid | grep screen | grep -v grep)" ] && outputn "[ALREADY RUNNING]" || {
+
+            # use screen to resume qtv window later
+            screen -dmS qtv ./qtv.bin +exec qtv.cfg +mvdport $qtv_port
+
+            # store process id in settings folder
+            screen_info=$(screen -ls | grep qtv | sed -r 's/\s//g' | head -1)
+            pid=${screen_info%%.*}
+
+            # store process id in settings folder
+            echo $pid > $settingsdir/pid/qtv
+
+            outputn "[OK]"
+
+        }
+
+    } || {
+
+        [ $pid -gt 0 ] && [ "$(ps -p $pid | grep qtv | grep -v grep)" ] && outputn "[ALREADY RUNNING]" || {
+
+            # start qtv in the background
+            ./qtv.bin +exec qtv.cfg +mvdport $qtv_port >/dev/null &
+
+            # store process id in settings folder
+            echo $! > $settingsdir/pid/qtv
+
+            outputn "[OK]"
+
+        }
+
+    }
+
+}
+
+[ $use_qwfwd -eq 1 ] && {
+
+    # check if qwfwd configuration file has been altered
+    [ `grep -F "//set hostname" $settingsdir/qwfwd.conf` ] && \
+        error "You need to configure $settingsdir/qwfwd.conf"
+
+    # check if the quit line has been removed
+    [ `grep -Fx "quit" $settingsdir/qwfwd.conf` ] && \
+        error "You forgot to remove the \"quit\" line in $settingsdir/qwfwd.conf"
+
+    cd $serverdir/qwfwd
+
+    output "* Starting qwfwd (port 30000)..."
+
+    # check if process id has been saved
+    [ -f $settingsdir/pid/qwfwd ] && pid=$(cat $settingsdir/pid/qwfwd) || pid=0
+
+    [ $use_screen -eq 1 ] && {
+
+        [ $pid -gt 0 ] && [ "$(ps -p $pid | grep screen | grep -v grep)" ] && outputn "[ALREADY RUNNING]" || {
+
+            # use screen to resume qwfwd window later
+            screen -dmS qwfwd ./qwfwd.bin
+
+            # store process id in settings folder
+            screen_info=$(screen -ls | grep qwfwd | sed -r 's/\s//g' | head -1)
+            pid=${screen_info%%.*}
+
+            # store process id in settings folder
+            echo $pid > $settingsdir/pid/qwfwd
+
+            outputn "[OK]"
+
+        }
+
+    } || {
+
+        [ $pid -gt 0 ] && [ "$(ps -p $pid | grep qwfwd | grep -v grep)" ] && outputn "[ALREADY RUNNING]" || {
+
+            # start qwfwd in the background
+            ./qwfwd.bin >/dev/null &
+
+            # store process id in settings folder
+            echo $! > $settingsdir/pid/qwfwd
+
+            outputn "[OK]"
+
+        }
+
+    }
+
+}
+
+# display screen help message if used
+[ $use_screen -eq 1 ] && [ $silent -eq 0 ] && {
+
+    echo
+    printf "Resume screen sessions using 'screen -x "
+    [ $use_mvdsv -eq 1 ] && {
+
+        printf "mvdsv"
+        [ $use_qtv -eq 1 ] || [ $use_qwfwd -eq 1 ] && printf "|"
+
+    }
+    [ $use_qtv -eq 1 ] && {
+
+        printf "qtv"
+        [ $use_qwfwd -eq 1 ] && printf "|"
+
+    }
+    [ $use_qwfwd -eq 1 ] && {
+
+        printf "qwfwd"
+
+    }
+    echo "'"
+
+}
+
+exit $error
