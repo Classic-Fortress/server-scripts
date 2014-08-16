@@ -166,6 +166,7 @@ mv $tmpdir/qtv/qtv.cfg $serverdir/qtv/qtv.cfg 2>/dev/null || fail=1
 mv $tmpdir/qw/mvdsv.cfg $serverdir/qw/mvdsv.cfg 2>/dev/null || fail=1
 mv $tmpdir/qw/server.cfg $serverdir/qw/server.cfg 2>/dev/null || fail=1
 mv $tmpdir/qwfwd/qwfwd.cfg $serverdir/qwfwd/qwfwd.cfg 2>/dev/null || fail=1
+mv $tmpdir/getmap.sh $serverdir/getmap.sh 2>/dev/null || fail=1
 mv $tmpdir/update_binaries.sh $serverdir/update_binaries.sh 2>/dev/null || fail=1
 mv $tmpdir/update_configs.sh $serverdir/update_configs.sh 2>/dev/null || fail=1
 mv $tmpdir/update_maps.sh $serverdir/update_maps.sh 2>/dev/null || fail=1
