@@ -71,7 +71,7 @@ cd $tmpdir
 # ask to restart servers if --silent and --no-restart were not used
 [ $silent -eq 0 ] && {
 
-    [ $norestart -eq 1 ] && restart="n" || read -p "Restart servers and proxies? (y/n) [y]: " restart
+    [ $norestart -eq 1 ] && restart="n" || read -p "Restart servers and proxies when done? (y/n) [y]: " restart
 
 }
 
