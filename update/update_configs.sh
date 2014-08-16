@@ -6,8 +6,8 @@
 
 # parameters:
 # --silent      makes the script silent and will
-#               automatically select a mirror and
-#               restart your servers and proxies.
+#               automatically restart your servers
+#               and proxies.
 # --no-restart  will stop the script from auto-
 #               matically restarting your servers
 #               and proxies.
@@ -67,54 +67,6 @@ cd $tmpdir
 # check if unzip and curl are installed
 [ `which unzip` ] || error "The package 'unzip' is not installed. Please install it and run the installation again."
 [ `which curl` ] || error "The package 'curl' is not installed. Please install it and run the installation again."
-
-# download cfort.ini
-curl --silent --output $tmpdir/cfort.ini https://raw.githubusercontent.com/Classic-Fortress/client-installer/master/cfort.ini || \
-    error "Failed to download 'cfort.ini' (mirror information) from remote server."
-
-# check if cfort.ini actually contains anything
-[ -s $tmpdir/cfort.ini ] || error "Downloaded 'cfort.ini' but file is empty. Exiting."
-
-# skip mirror selection if --silent was specified
-[ $silent -eq 0 ] && {
-
-    outputn "Select a download mirror:"
-
-    # print mirrors and number them
-    grep "[0-9]\{1,2\}=\".*" $tmpdir/cfort.ini | cut -d "\"" -f2 | nl
-
-    output "Enter mirror number [random]: "
-
-    # read user's input
-    read mirror
-
-    # get mirror address from cfort.ini
-    mirror=$(grep "^$mirror=[fhtp]\{3,4\}://[^ ]*$" $tmpdir/cfort.ini | cut -d "=" -f2)
-
-}
-
-# count mirrors
-mirrors=$(grep "[0-9]=\"" $tmpdir/cfort.ini | wc -l)
-
-[ -z $mirror ] && [ $mirrors -gt 1 ] && {
-
-    # calculate range (amount of mirrors + 1)
-    range=$(expr$(grep "[0-9]=\"" $tmpdir/cfort.ini | nl | tail -n1 | cut -f1) + 1)
-
-    while [ -z $mirror ]; do
-
-        # generate a random number
-        number=$RANDOM
-
-        # divide the random number with the calculated range and put the remainder in $number
-        let "number %= $range"
-
-        # get the nth mirror using the random number
-        mirror=$(grep "^$number=[fhtp]\{3,4\}://[^ ]*$" $tmpdir/cfort.ini | cut -d "=" -f2)
-
-    done
-
-} || mirror=$(grep "^1=[fhtp]\{3,4\}://[^ ]*$" $tmpdir/cfort.ini | cut -d "=" -f2)
 
 # ask to restart servers if --silent and --no-restart were not used
 [ $silent -eq 0 ] && {
