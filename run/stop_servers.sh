@@ -4,12 +4,11 @@
 ## CLASSIC FORTRESS STOP SCRIPT ##
 ##################################
 
-# PLEASE NOTE!
 # settings can be changed within start_servers.sh
 
-##################################################
-## script starts here - do not edit lines below ##
-##################################################
+######################
+##  INITIALIZATION  ##
+######################
 
 # print functions
 output() {
@@ -38,6 +37,10 @@ silent=0
 
 # set silent mode if first parameter is --silent
 [ "$1" = "--silent" ] && silent=1
+
+#######################
+## MVDSV TERMINATION ##
+#######################
 
 [ $use_mvdsv -eq 1 ] && {
 
@@ -77,9 +80,13 @@ silent=0
 
 }
 
+######################
+## QTV TERMINATION  ##
+######################
+
 [ $use_qtv -eq 1 ] && {
 
-    output "* Stopping qtv (port $qtv_port)..."
+    output "* Stopping qtv (port $qtv_port)....."
 
     # check if process id has been saved
     [ -f $settingsdir/pid/qtv ] && pid=$(cat $settingsdir/pid/qtv) || pid=0
@@ -114,6 +121,10 @@ silent=0
     rm -f $settingsdir/pid/qtv
 
 }
+
+#######################
+## QWFWD TERMINATION ##
+#######################
 
 [ $use_qwfwd -eq 1 ] && {
 
