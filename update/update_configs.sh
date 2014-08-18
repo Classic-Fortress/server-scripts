@@ -1,8 +1,8 @@
 #!/bin/sh
 
-#############################################
-## CLASSIC FORTRESS UPDATE BINARIES SCRIPT ##
-#############################################
+############################################
+## CLASSIC FORTRESS UPDATE CONFIGS SCRIPT ##
+############################################
 
 # parameters:
 # --silent      makes the script silent and will
@@ -12,24 +12,22 @@
 #               matically restarting your servers
 #               and proxies.
 
-##################################################
-## script starts here - do not edit lines below ##
-##################################################
+######################
+##  INITIALIZATION  ##
+######################
 
 # functions
 error() {
     [ $silent -eq 0 ] && {
         echo
-        printf "ERROR: %s\n" "$*"
+        printf "%s\n" "$*"
     }
-
-    cd
 
     # remove temporary directory if it exists
     [ -d $tmpdir ] && rm -rf $tmpdir
 
     # remove backup directory if it's empty
-    [ ! -z "$(ls -1 $backupdir)" ] && rm -rf $backupdir
+    [ ! -z "$(ls -1 $backupdir)" ] && -rf $backupdir
 
     exit 1
 }
@@ -43,12 +41,21 @@ outputn() {
 
     return 0
 }
+iffailed() {
+    [ $silent -eq 0 ] && [ $fail -eq 1 ] && {
+        echo "fail"
+        printf "%s\n" "$*"
+        exit 1
+    }
+
+    return 1
+}
 
 # initialize variables
 eval settingsdir=~/.cfortsv
 eval serverdir=$(cat $settingsdir/install_dir)
 eval backupdir=$serverdir/backup
-eval tmpdir=$serverdir/tmp
+eval tmpdir=$settingsdir/tmp
 github=https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/
 silent=0
 norestart=0
@@ -65,17 +72,17 @@ cd $tmpdir
 [ "$1" = "--no-restart" ] || [ "$2" = "--no-restart" ] && norestart=1
 
 # check if unzip and curl are installed
-[ `which unzip` ] || error "The package 'unzip' is not installed. Please install it and run the installation again."
-[ `which curl` ] || error "The package 'curl' is not installed. Please install it and run the installation again."
+[ `which unzip` ] || error "ERROR: The package 'unzip' is not installed. Please install it and run the installation again."
+[ `which curl` ] || error "ERROR: The package 'curl' is not installed. Please install it and run the installation again."
 
 # ask to restart servers if --silent and --no-restart were not used
-[ $silent -eq 0 ] && {
-
-    [ $norestart -eq 1 ] && restart="n" || read -p "Restart servers and proxies when done? (y/n) [y]: " restart
-
-}
+[ $silent -eq 1 ] || [ $norestart -eq 1 ] && restart="n" || { outputn; read -p "Restart servers and proxies? (y/n) [y]: " restart; outputn; }
 
 output "Installing configs..."
+
+######################
+##     DOWNLOAD     ##
+######################
 
 # download configs
 curl --silent --output $tmpdir/fortress/fortress.cfg $github/config/fortress/fortress.cfg && output "." || fail=1
@@ -109,27 +116,20 @@ curl --silent --output $tmpdir/stop_servers.sh $github/run/stop_servers.sh && ou
 [ -s $serverdir/qtv/config.cfg ] || fail=1
 [ -s $serverdir/qwfwd/config.cfg ] || fail=1
 
-# abort if download failed
-[ $fail -eq 0 ] && output "." || {
+iffailed "ERROR: Could not download configuration files. Try again later." || output "."
 
-    outputn "fail"
-
-    error "Could not download configuration files. Try again later."
-
-}
+######################
+##   STOP SERVERS   ##
+######################
 
 # stop servers and proxies if set to restart
-[ "$restart" = "y" ] && {
+[ "$restart" != "n" ] && ($serverdir/stop_servers.sh --silent || fail=1)
 
-    ($serverdir/stop_servers.sh --silent && output ".") || {
+iffailed "ERROR: Could not stop servers and proxies. Exiting." || output "."
 
-        outputn "fail"
-
-        error "Could not stop servers and proxies. Exiting."
-
-    }
-
-}
+######################
+##      BACKUP      ##
+######################
 
 # create a tar.gz of old configs in backup directory
 cd $serverdir
@@ -149,14 +149,11 @@ tar czf $backupname \
     2>/dev/null
 mv $backupname $backupdir 2>/dev/null || fail=1
 
-# abort if moving of old binaries failed
-[ $fail -eq 0 ] && output "." || {
+iffailed "ERROR: Could not move old configs to backup directory. Something might be wrong with your installation." || output "."
 
-    outputn "fail"
-
-    error "Could not move old configs to backup directory. Something might be wrong with your installation."
-
-}
+######################
+##   INSTALLATION   ##
+######################
 
 # move new stuff to working directory
 find $tmpdir -name "*.cfg" -exec chmod 644 {} \;
@@ -176,32 +173,24 @@ mv $tmpdir/stop_servers.sh $serverdir/stop_servers.sh 2>/dev/null || fail=1
 [ -s $tmpdir/qwfwd/config.cfg ] && (mv $tmpdir/qwfwd/config.cfg $serverdir/qwfwd/config.cfg 2>/dev/null || fail=1)
 [ -s $tmpdir/qtv/config.cfg ] && (mv $tmpdir/qtv/config.cfg $serverdir/qtv/config.cfg 2>/dev/null || fail=1)
 
-# abort if moving of binaries failed
-[ $fail -eq 0 ] && output "." || {
+iffailed "ERROR: Could not install configs in server directory. Something might be wrong with your installation." || output "."
 
-    outputn "fail"
-
-    error "Could not install configs in server directory. Something might be wrong with your installation."
-
-}
-
-# remove temporary directory
-rm -rf $tmpdir
-output "."
+######################
+##  START SERVERS   ##
+######################
 
 # start servers and proxies if set to restart
-[ "$restart" = "y" ] && {
+[ "$restart" != "n" ] && ($serverdir/start_servers.sh --silent || fail=1)
 
-    ($serverdir/start_servers.sh --silent && output ".") || {
+iffailed "ERROR: Could not restart servers and proxies. Try restarting them manually." || output "."
 
-        outputn "fail"
+######################
+##     CLEANUP      ##
+######################
 
-        error "Could not restart servers and proxies. Try restarting them manually."
+# remove temporary directory
+rm -rf $tmpdir || fail=1
 
-    }
-
-}
-
-outputn "done"
+iffailed "ERROR: Could not remove temporary directory '$tmpdir'. Perhaps you have some permission problems." || outputn "done"
 
 exit 0

@@ -1,8 +1,8 @@
 #!/bin/sh
 
-#############################################
-## CLASSIC FORTRESS UPDATE BINARIES SCRIPT ##
-#############################################
+#########################################
+## CLASSIC FORTRESS UPDATE MAPS SCRIPT ##
+#########################################
 
 # parameters:
 # --silent      makes the script silent and will
@@ -12,21 +12,22 @@
 #               matically restarting your servers
 #               and proxies.
 
-##################################################
-## script starts here - do not edit lines below ##
-##################################################
+######################
+##  INITIALIZATION  ##
+######################
 
 # functions
 error() {
     [ $silent -eq 0 ] && {
         echo
-        printf "ERROR: %s\n" "$*"
+        printf "%s\n" "$*"
     }
-
-    cd
 
     # remove temporary directory if it exists
     [ -d $tmpdir ] && rm -rf $tmpdir
+
+    # remove backup directory if it's empty
+    [ ! -z "$(ls -1 $backupdir)" ] && -rf $backupdir
 
     exit 1
 }
@@ -40,12 +41,21 @@ outputn() {
 
     return 0
 }
+iffailed() {
+    [ $silent -eq 0 ] && [ $fail -eq 1 ] && {
+        echo "fail"
+        printf "%s\n" "$*"
+        exit 1
+    }
+
+    return 1
+}
 
 # initialize variables
 eval settingsdir=~/.cfortsv
 eval serverdir=$(cat $settingsdir/install_dir)
 eval fortressdir=$serverdir/fortress
-eval tmpdir=$serverdir/tmp
+eval tmpdir=$settingsdir/tmp
 github=https://raw.githubusercontent.com/Classic-Fortress/server-scripts/master/
 silent=0
 norestart=0
@@ -71,6 +81,10 @@ curl --silent --output $tmpdir/cfort.ini https://raw.githubusercontent.com/Class
 
 # check if cfort.ini actually contains anything
 [ -s $tmpdir/cfort.ini ] || error "Downloaded 'cfort.ini' but file is empty. Exiting."
+
+######################
+## MIRROR SELECTION ##
+######################
 
 # skip mirror selection if --silent was specified
 [ $silent -eq 0 ] && {
@@ -114,13 +128,14 @@ mirrors=$(grep "[0-9]=\"" $tmpdir/cfort.ini | wc -l)
 } || mirror=$(grep "^1=[fhtp]\{3,4\}://[^ ]*$" $tmpdir/cfort.ini | cut -d "=" -f2)
 
 # ask to restart servers if --silent and --no-restart were not used
-[ $silent -eq 0 ] && {
+[ $silent -eq 1 ] || [ $norestart -eq 1 ] && restart="n" || { outputn; read -p "Restart servers and proxies? (y/n) [y]: " restart; }
 
-    [ $norestart -eq 1 ] && restart="n" || read -p "Restart servers and proxies? (y/n) [y]: " restart
-
-}
-
+outputn
 output "Installing maps..."
+
+######################
+##     DOWNLOAD     ##
+######################
 
 # download maps
 curl --silent --output $tmpdir/cfortsv-maps.zip $mirror/cfortsv-maps.zip && output "." || fail=1
@@ -128,71 +143,53 @@ curl --silent --output $tmpdir/cfortsv-maps.zip $mirror/cfortsv-maps.zip && outp
 # check if files contain anything
 [ -s $tmpdir/cfortsv-maps.zip ] || fail=1
 
-# abort if download failed
-[ $fail -eq 0 ] && output "." || {
+iffailed "ERROR: Could not download maps. Try again later." || output "."
 
-    outputn "fail"
-
-    error "Could not download maps. Try again later."
-
-}
+######################
+##    UNPACKING     ##
+######################
 
 # unpack maps
 unzip -qqo $tmpdir/cfortsv-maps.zip -d $tmpdir 2>/dev/null || fail=1
 
-# abort if installation failed
-[ $fail -eq 0 ] && output "." || {
+iffailed "Could not unpack maps. Try running the script again." || output "."
 
-    outputn "fail"
-
-    error "Could not unpack maps. Try running the script again."
-
-}
+######################
+##   STOP SERVERS   ##
+######################
 
 # stop servers and proxies if set to restart
-[ "$restart" = "y" ] && {
+[ "$restart" != "n" ] && ($serverdir/stop_servers.sh --silent || fail=1)
 
-    ($serverdir/stop_servers.sh --silent && output ".") || {
+iffailed "ERROR: Could not stop servers and proxies. Exiting." || output "."
 
-        outputn "fail"
-
-        error "Could not stop servers and proxies. Exiting."
-
-    }
-
-}
+######################
+##   INSTALLATION   ##
+######################
 
 # move new stuff to working directory
 [ -d $tmpdir/fortress/maps ] && (mv -n $tmpdir/fortress/maps/* $serverdir/fortress/maps/ 2>/dev/null || fail=1)
 [ -d $tmpdir/fortress/progs ] && (mv -n $tmpdir/fortress/progs/* $serverdir/fortress/progs/ 2>/dev/null || fail=1)
 [ -d $tmpdir/fortress/sound ] && (mv -n $tmpdir/fortress/sound/* $serverdir/fortress/sound/ 2>/dev/null || fail=1)
 
-# abort if moving of binaries failed
-[ $fail -eq 0 ] && output "." || {
+iffailed "ERROR: Could not install maps in server directory. Perhaps you have some permission problems." || output "."
 
-    outputn "fail"
-
-    error "Could not install maps in server directory. Something might be wrong with your installation."
-
-}
-
-# remove temporary directory
-rm -rf $tmpdir
-output "."
+######################
+##  START SERVERS   ##
+######################
 
 # start servers and proxies if set to restart
-[ "$restart" = "y" ] && {
+[ "$restart" != "n" ] && ($serverdir/start_servers.sh --silent || fail=1)
 
-    ($serverdir/start_servers.sh --silent && output ".") || {
+iffailed "ERROR: Could not restart servers and proxies. Try restarting them manually." || output "."
 
-        outputn "fail"
+######################
+##     CLEANUP      ##
+######################
 
-        error "Could not restart servers and proxies. Try restarting them manually."
+# remove temporary directory
+rm -rf $tmpdir || fail=1
 
-    }
-
-}
-
-outputn "done"
+iffailed "ERROR: Could not remove temporary directory '$tmpdir'. Perhaps you have some permission problems." || outputn "done"
 
 exit 0

@@ -12,15 +12,15 @@
 #               matically restarting your servers
 #               and proxies.
 
-##################################################
-## script starts here - do not edit lines below ##
-##################################################
+######################
+##  INITIALIZATION  ##
+######################
 
 # functions
 error() {
     [ $silent -eq 0 ] && {
         echo
-        printf "ERROR: %s\n" "$*"
+        printf "%s\n" "$*"
     }
 
     # remove temporary directory if it exists
@@ -41,12 +41,21 @@ outputn() {
 
     return 0
 }
+iffailed() {
+    [ $silent -eq 0 ] && [ $fail -eq 1 ] && {
+        echo "fail"
+        printf "%s\n" "$*"
+        exit 1
+    }
+
+    return 1
+}
 
 # initialize variables
 eval settingsdir="~/.cfortsv"
 eval serverdir="$(cat $settingsdir/install_dir)"
 eval backupdir=$serverdir/backup
-eval tmpdir=$serverdir/tmp
+eval tmpdir=$settingsdir/tmp
 silent=0
 norestart=0
 fail=0
@@ -61,15 +70,19 @@ mkdir -p $tmpdir $backupdir
 [ "$1" = "--no-restart" ] || [ "$2" = "--no-restart" ] && norestart=1
 
 # check if unzip and curl are installed
-[ `which unzip` ] || error "The package 'unzip' is not installed. Please install it and run the installation again."
-[ `which curl` ] || error "The package 'curl' is not installed. Please install it and run the installation again."
+[ `which unzip` ] || error "ERROR: The package 'unzip' is not installed. Please install it and run the installation again."
+[ `which curl` ] || error "ERROR: The package 'curl' is not installed. Please install it and run the installation again."
 
 # download cfort.ini
 curl --silent --output $tmpdir/cfort.ini https://raw.githubusercontent.com/Classic-Fortress/client-installer/master/cfort.ini || \
-    error "Failed to download 'cfort.ini' (mirror information) from remote server."
+    error "ERROR: Failed to download 'cfort.ini' (mirror information) from remote server."
 
 # check if cfort.ini actually contains anything
-[ -s "$tmpdir/cfort.ini" ] || error "Downloaded 'cfort.ini' but file is empty. Exiting."
+[ -s "$tmpdir/cfort.ini" ] || error "ERROR: Downloaded 'cfort.ini' but file is empty. Exiting."
+
+######################
+## MIRROR SELECTION ##
+######################
 
 # skip mirror selection if --silent was specified
 [ $silent -eq 0 ] && {
@@ -97,7 +110,7 @@ mirrors=$(grep "[0-9]=\"" $tmpdir/cfort.ini | wc -l)
     # calculate range (amount of mirrors + 1)
     range=$(expr$(grep "[0-9]=\"" $tmpdir/cfort.ini | nl | tail -n1 | cut -f1) + 1)
 
-    while [ -z "$mirror" ]; do
+    while [ -z $mirror ]; do
 
         # generate a random number
         number=$RANDOM
@@ -113,126 +126,89 @@ mirrors=$(grep "[0-9]=\"" $tmpdir/cfort.ini | wc -l)
 } || mirror=$(grep "^1=[fhtp]\{3,4\}://[^ ]*$" $tmpdir/cfort.ini | cut -d "=" -f2)
 
 # ask to restart servers if --silent and --no-restart were not used
-[ $silent -eq 0 ] && {
+[ $silent -eq 1 ] || [ $norestart -eq 1 ] && restart="n" || { outputn; read -p "Restart servers and proxies? (y/n) [y]: " restart; }
 
-    [ $norestart -eq 1 ] && restart="n" || read -p "Restart servers and proxies? (y/n) [y]: " restart
+######################
+##     DOWNLOAD     ##
+######################
 
-}
-
+outputn
 output "Installing binaries..."
 
 # detect system architecture
-[ $(getconf LONG_BIT) = 64 ] && {
+[ $(getconf LONG_BIT) = 64 ] && arch=x64 || arch=x86
 
-    # download 64-bit binaries
-    curl --silent --output $tmpdir/cfortsv-bin-x64.zip $mirror/cfortsv-bin-x64.zip || fail=1
+# download binaries
+curl --silent --output $tmpdir/cfortsv-bin.zip $mirror/cfortsv-bin-$arch.zip || fail=1
+[ -s $tmpdir/cfortsv-bin.zip ] || fail=1
 
-    # check if downloaded zip actually contains something
-    [ -s "$tmpdir/cfortsv-bin-x64.zip" ] || fail=1
+iffailed "ERROR: Could not download binaries. Try again later." || output "."
 
-} || {
-
-    # download 32-bit binaries
-    curl --silent --output $tmpdir/cfortsv-bin-x86.zip $mirror/cfortsv-bin-x86.zip || fail=1
-
-    # check if downloaded zip actually contains something
-    [ -s "$tmpdir/cfortsv-bin-x86.zip" ] || fail=1
-
-}
-
-# abort if download failed
-[ $fail -eq 0 ] && output "." || {
-
-    outputn "fail"
-
-    error "Could not download binaries. Try again later."
-
-}
+######################
+##    UNPACKING     ##
+######################
 
 # unpack binaries
-[ $(getconf LONG_BIT) = 64 ] && {
+unzip -qqo $tmpdir/cfortsv-bin.zip -d $tmpdir 2>/dev/null || fail=1
 
-    unzip -qqo $tmpdir/cfortsv-bin-x64.zip -d $tmpdir 2>/dev/null || fail=1
+iffailed "ERROR: Could not unpack binaries. Try running the script again." || output "."
 
-} || {
-
-    unzip -qqo $tmpdir/cfortsv-bin-x86.zip -d $tmpdir 2>/dev/null || fail=1
-
-}
-
-# abort if installation failed
-[ $fail -eq 0 ] && output "." || {
-
-    outputn "fail"
-
-    error "Could not unpack binaries. Try running the script again."
-
-}
+######################
+##   STOP SERVERS   ##
+######################
 
 # stop servers and proxies if set to restart
-[ "$restart" = "y" ] && {
+[ "$restart" != "n" ] && ($serverdir/stop_servers.sh --silent || fail=1)
 
-    ($serverdir/stop_servers.sh --silent && output ".") || {
+iffailed "ERROR: Could not stop servers and proxies. Exiting." || output "."
 
-        outputn "fail"
+######################
+##      BACKUP      ##
+######################
 
-        error "Could not stop servers and proxies. Exiting."
-
-    }
-
-}
-
-# create a tar.gz of old binaries in backup directory
-cd $serverdir
+# create a tar/gzip of old binaries in backup directory
 backupname="binaries-backup-$(date +"%Y%m%d%H%M%S").tar.gz"
-tar czf $backupname fortress/qwprogs.dat qtv/qtv.bin qwfwd/qwfwd.bin mvdsv 2>/dev/null || fail=1
+(cd $serverdir && tar czf $backupname fortress/qwprogs.dat qtv/qtv.bin qwfwd/qwfwd.bin mvdsv 2>/dev/null) || fail=1
 mv $backupname $backupdir 2>/dev/null || fail=1
 
-# abort if moving of old binaries failed
-[ $fail -eq 0 ] && output "." || {
+iffailed "ERROR: Could not move old binaries to backup directory. Something might be wrong with your installation." || output "."
 
-    outputn "fail"
+######################
+##   INSTALLATION   ##
+######################
 
-    error "Could not move old binaries to backup directory. Something might be wrong with your installation."
+# set permissions
+chmod -f 644 "$tmpdir/fortress/qwprogs.dat" 2>/dev/null || fail=1
+chmod -f 755 "$tmpdir/qtv/qtv.bin" 2>/dev/null || fail=1
+chmod -f 755 "$tmpdir/qwfwd/qwfwd.bin" 2>/dev/null || fail=1
+chmod -f 755 "$tmpdir/mvdsv" 2>/dev/null || fail=1
 
-}
+iffailed "ERROR: Could not set proper permissions for installed binaries. Perhaps you have some permission problems." || output "."
 
-# move new stuff to working directory
-chmod -f 644 "$tmpdir/fortress/qwprogs.dat" 2>/dev/null
-chmod -f 755 "$tmpdir/qtv/qtv.bin" 2>/dev/null
-chmod -f 755 "$tmpdir/qwfwd/qwfwd.bin" 2>/dev/null
-chmod -f 755 "$tmpdir/mvdsv" 2>/dev/null
+# move stuff to server folder
 mv "$tmpdir/mvdsv" "$serverdir/mvdsv" 2>/dev/null || fail=1
 mv "$tmpdir/fortress/qwprogs.dat" "$serverdir/fortress/qwprogs.dat" 2>/dev/null || fail=1
 mv "$tmpdir/qtv/qtv.bin" "$serverdir/qtv/qtv.bin" 2>/dev/null || fail=1
 mv "$tmpdir/qwfwd/qwfwd.bin" "$serverdir/qwfwd/qwfwd.bin" 2>/dev/null || fail=1
 
-# abort if moving of binaries failed
-[ $fail -eq 0 ] && output "." || {
+iffailed "ERROR: Could not install binaries in server directory. Perhaps you have some permission problems." || output "."
 
-    outputn "fail"
-
-    error "Could not install binaries in server directory. Something might be wrong with your installation."
-
-}
-
-# remove temporary directory
-rm -rf $tmpdir
-output "."
+######################
+##  START SERVERS   ##
+######################
 
 # start servers and proxies if set to restart
-[ "$restart" = "y" ] && {
+[ "$restart" != "n" ] && ($serverdir/start_servers.sh --silent || fail=1)
 
-    ($serverdir/start_servers.sh --silent && output ".") || {
+iffailed "ERROR: Could not restart servers and proxies. Try restarting them manually." || output "."
 
-        outputn "fail"
+######################
+##     CLEANUP      ##
+######################
 
-        error "Could not restart servers and proxies. Try restarting them manually."
+# remove temporary directory
+rm -rf $tmpdir || fail=1
 
-    }
-
-}
-
-outputn "done"
+iffailed "ERROR: Could not remove temporary directory '$tmpdir'. Perhaps you have some permission problems." || outputn "done"
 
 exit 0
