@@ -11,12 +11,18 @@
 # functions
 error() {
     printf "%s\n" "$*"
+
+    # remove temporary directory if it exists
     [ -d $tmpdir ] && rm -rf $tmpdir
+
     exit 1
 }
 quit() {
     printf "%s\n" "$*"
+
+    # remove temporary directory if it exists
     [ -d $tmpdir ] && rm -rf $tmpdir
+
     exit 0
 }
 iffailed() {
@@ -36,6 +42,9 @@ eval fortressdir=$serverdir/fortress
 eval tmpdir=$settingsdir/tmp
 mapname=${1%.*}
 fail=0
+
+# check if parameters were given
+[ -z $1 ] && quit "You need to specify a map to download."
 
 # initialize folders
 mkdir -p $tmpdir $fortressdir/maps $fortressdir/sound $fortressdir/progs
