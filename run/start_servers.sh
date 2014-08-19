@@ -140,7 +140,9 @@ mkdir -p $settingsdir/pid
 
         }
 
-    } || {
+    }
+
+    [ $use_screen -eq 0 ] && {
 
         [ $pid -gt 0 ] && [ "$(ps -p $pid | grep mvdsv | grep -v grep)" ] && outputn "[ALREADY RUNNING]" || {
 
@@ -211,7 +213,9 @@ mkdir -p $settingsdir/pid
 
         }
 
-    } || {
+    }
+
+    [ $use_screen -eq 0 ] && {
 
         [ $pid -gt 0 ] && [ "$(ps -p $pid | grep qtv | grep -v grep)" ] && outputn "[ALREADY RUNNING]" || {
 
@@ -269,7 +273,9 @@ mkdir -p $settingsdir/pid
 
         }
 
-    } || {
+    }
+
+    [ $use_screen -eq 0 ] && {
 
         [ $pid -gt 0 ] && [ "$(ps -p $pid | grep qwfwd | grep -v grep)" ] && outputn "[ALREADY RUNNING]" || {
 
